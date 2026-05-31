@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>我的英文背單字本</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>📖 我的英文背單字本</h1>
+    <p class="subtitle">單字自動標音標 · 點一下就發音 · 離線本機儲存</p>
+  </header>
+
+  <main class="container">
+    <section class="add-box">
+      <div class="add-fields">
+        <textarea id="input" rows="2" placeholder="輸入英文單字或句子，例如：apple 或 How are you?"></textarea>
+        <input id="inputZh" type="text" placeholder="中文意思（可不填），例如：蘋果" />
+      </div>
+      <button id="addBtn" class="btn-primary">＋ 新增</button>
+    </section>
+
+    <details class="help">
+      <summary>📌 使用說明</summary>
+      <ul>
+        <li><b>句子翻譯需要連線</b>：新增句子後會自動上網翻譯中文（單字則用內建離線對照表）。</li>
+        <li><b>點擊中文註解可修改</b>：點任一筆的中文，即可手動修改翻譯內容。</li>
+        <li>單字會自動標音標；按 🔊 只念英文，循環播放會先念英文再念中文。</li>
+        <li>勾選左側方塊可多選，按「🗑️ 刪除選取」一次刪除。</li>
+      </ul>
+    </details>
+
+    <section class="toolbar">
+      <input id="search" type="search" placeholder="🔍 搜尋已加入的內容…" />
+      <span id="count" class="count">共 0 筆</span>
+    </section>
+
+    <section class="controls">
+      <button id="loopBtn" class="btn-loop">🔁 循環播放</button>
+      <label class="scope">
+        播放範圍
+        <select id="loopScope">
+          <option value="all">全部</option>
+          <option value="word">只單字</option>
+          <option value="sentence">只句子</option>
+          <option value="checked">只播勾選的</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="controls">
+      <label class="speed">
+        語速 <span id="speedVal">1.0×</span>
+        <input id="speed" type="range" min="0.5" max="1.5" step="0.1" value="1" />
+      </label>
+    </section>
+
+    <section id="bulkBar" class="bulk-bar hidden">
+      <label class="select-all"><input id="selectAll" type="checkbox" /> 全選</label>
+      <span id="selCount" class="count">已選 0 筆</span>
+      <button id="delSelBtn" class="btn-del-sel">🗑️ 刪除所選</button>
+    </section>
+
+    <ul id="list" class="list"></ul>
+    <p id="empty" class="empty">還沒有任何內容，從上面新增第一筆吧！</p>
+  </main>
+
+  <script src="dict.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -12,6 +12,9 @@ const $loopBtn = document.getElementById("loopBtn");
 const $loopScope = document.getElementById("loopScope");
 const $speed = document.getElementById("speed");
 const $speedVal = document.getElementById("speedVal");
+const $enVoice = document.getElementById("enVoice");
+const $zhVoice = document.getElementById("zhVoice");
+const $testVoiceBtn = document.getElementById("testVoiceBtn");
 const $bulkBar = document.getElementById("bulkBar");
 const $selectAll = document.getElementById("selectAll");
 const $selCount = document.getElementById("selCount");
@@ -203,10 +206,48 @@ function pickZhVoice() {
   }
   zhVoice = zh[0] || null;
 }
+// ---- 使用者自選語音（記住在本機）----
+let userEnVoiceURI = localStorage.getItem("en_voice_uri") || "";
+let userZhVoiceURI = localStorage.getItem("zh_voice_uri") || "";
+
+function allVoices() {
+  return window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+}
+// 實際使用的英文語音：使用者選的 > 自動挑的
+function getEnVoice() {
+  const v = allVoices().find((x) => x.voiceURI === userEnVoiceURI);
+  return v || bestVoice;
+}
+function getZhVoice() {
+  const v = allVoices().find((x) => x.voiceURI === userZhVoiceURI);
+  return v || zhVoice;
+}
+
+// 把可用語音填進下拉選單
+function fillVoiceSelect(sel, filterFn, currentURI) {
+  if (!sel) return;
+  const list = allVoices().filter(filterFn);
+  sel.innerHTML = '<option value="">（自動挑選最自然）</option>';
+  list.forEach((v) => {
+    const opt = document.createElement("option");
+    opt.value = v.voiceURI;
+    opt.textContent = v.name + "（" + v.lang + "）";
+    if (v.voiceURI === currentURI) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function populateVoiceMenus() {
+  fillVoiceSelect($enVoice, (v) => /^en(-|_)/i.test(v.lang) || /english/i.test(v.name), userEnVoiceURI);
+  fillVoiceSelect($zhVoice, (v) => /^zh(-|_)/i.test(v.lang) || /chinese|國語|普通话|中文/i.test(v.name), userZhVoiceURI);
+}
+
 if ("speechSynthesis" in window) {
   pickBestVoice();
   pickZhVoice();
-  window.speechSynthesis.onvoiceschanged = () => { pickBestVoice(); pickZhVoice(); };
+  populateVoiceMenus();
+  window.speechSynthesis.onvoiceschanged = () => {
+    pickBestVoice(); pickZhVoice(); populateVoiceMenus();
+  };
 }
 
 // 念出一段文字（指定語言/語音），回傳 Promise，念完才 resolve
@@ -231,8 +272,9 @@ function speak(text, el) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   if (!bestVoice) pickBestVoice();
-  if (bestVoice) u.voice = bestVoice;
-  u.lang = (bestVoice && bestVoice.lang) || "en-US";
+  const v = getEnVoice();
+  if (v) u.voice = v;
+  u.lang = (v && v.lang) || "en-US";
   u.rate = speechRate;
   u.pitch = 1;
   if (el) {
@@ -275,13 +317,13 @@ function startLoop() {
 
     if (!bestVoice) pickBestVoice();
     // 先念英文
-    await speakAsync(it.text, bestVoice, "en-US");
+    await speakAsync(it.text, getEnVoice(), "en-US");
     if (!isLooping) return;
     // 再念中文（若有填中文）
     if (it.zh) {
       await new Promise((r) => setTimeout(r, 250));
       if (!isLooping) return;
-      await speakAsync(it.zh, zhVoice, "zh-TW");
+      await speakAsync(it.zh, getZhVoice(), "zh-TW");
       if (!isLooping) return;
     }
     idx++;
@@ -446,6 +488,21 @@ $speed.addEventListener("input", () => {
   speechRate = parseFloat($speed.value);
   localStorage.setItem("speech_rate", speechRate);
   applySpeedLabel();
+});
+
+// 語音選單事件
+$enVoice.addEventListener("change", () => {
+  userEnVoiceURI = $enVoice.value;
+  localStorage.setItem("en_voice_uri", userEnVoiceURI);
+});
+$zhVoice.addEventListener("change", () => {
+  userZhVoiceURI = $zhVoice.value;
+  localStorage.setItem("zh_voice_uri", userZhVoiceURI);
+});
+$testVoiceBtn.addEventListener("click", async () => {
+  window.speechSynthesis.cancel();
+  await speakAsync("Hello, this is a test.", getEnVoice(), "en-US");
+  await speakAsync("這是試聽。", getZhVoice(), "zh-TW");
 });
 
 // 多選刪除事件

@@ -61,6 +61,14 @@ body {
 .help ul { margin: 10px 0 4px; padding-left: 18px; color: var(--text); line-height: 1.7; }
 .help li { margin-bottom: 4px; }
 .help b { color: var(--blue); }
+.voice-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-size: 0.9rem; color: var(--muted);
+}
+.voice-row select {
+  flex: 1; padding: 12px; font-size: 1rem; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--card); color: var(--text);
+}
 
 .toolbar {
   display: flex; align-items: center; gap: 10px; margin-bottom: 12px;

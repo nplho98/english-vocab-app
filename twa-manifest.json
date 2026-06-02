@@ -4,6 +4,7 @@
   "name": "我的英文背單字本",
   "launcherName": "背單字本",
   "display": "standalone",
+  "splashScreenFadeOutDuration": 300,
   "themeColor": "#2563eb",
   "themeColorDark": "#000000",
   "navigationColor": "#000000",

@@ -30,7 +30,7 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://nplho98.github.io/english-vocab-app/",
-  "minSdkVersion": 19,
+  "minSdkVersion": 21,
   "orientation": "portrait",
   "fingerprints": [],
   "signingKey": {

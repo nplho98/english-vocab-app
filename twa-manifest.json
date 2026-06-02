@@ -1,0 +1,39 @@
+{
+  "packageId": "io.github.nplho98.twa",
+  "host": "nplho98.github.io",
+  "name": "我的英文背單字本",
+  "launcherName": "背單字本",
+  "display": "standalone",
+  "themeColor": "#2563eb",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#f1f5f9",
+  "enableNotifications": false,
+  "startUrl": "/english-vocab-app/",
+  "iconUrl": "https://nplho98.github.io/english-vocab-app/icon-512.png",
+  "maskableIconUrl": "https://nplho98.github.io/english-vocab-app/icon-512.png",
+  "appVersionName": "1.1",
+  "appVersionCode": 2,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://nplho98.github.io/english-vocab-app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://nplho98.github.io/english-vocab-app/",
+  "minSdkVersion": 19,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "signingKey": {
+    "path": "./signing.keystore",
+    "alias": "my-key-alias"
+  }
+}

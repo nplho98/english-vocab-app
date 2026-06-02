@@ -22,17 +22,40 @@ const $delSelBtn = document.getElementById("delSelBtn");
 
 let items = loadItems();
 const selectedIds = new Set();
-let speechRate = parseFloat(localStorage.getItem("speech_rate")) || 1;
+// 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
+function loadSpeechRate() {
+  const r = parseFloat(localStorage.getItem("speech_rate"));
+  if (!isFinite(r)) return 1;
+  return Math.min(1.5, Math.max(0.5, r));
+}
+let speechRate = loadSpeechRate();
 let isLooping = false;
 let loopTimer = null;
 
 // ---- 資料存取（本機 localStorage，關閉 App 不消失）----
 function loadItems() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const list = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    // 補上複習欄位（舊資料沒有 box/due 就補成「今天就要複習」）
+    list.forEach((it) => {
+      if (typeof it.box !== "number") it.box = 0;
+      if (typeof it.due !== "number") it.due = Date.now();
+    });
+    return list;
   } catch {
     return [];
   }
+}
+
+// ---- 間隔重複（Leitner）：答對升一級，間隔拉長；答錯歸零 ----
+const SRS_DAY = 24 * 60 * 60 * 1000;
+const SRS_INTERVALS = [10 * 60 * 1000, SRS_DAY, 2 * SRS_DAY, 4 * SRS_DAY, 7 * SRS_DAY, 14 * SRS_DAY];
+function nextDue(box) {
+  return Date.now() + SRS_INTERVALS[Math.min(box, SRS_INTERVALS.length - 1)];
+}
+function dueItems() {
+  const now = Date.now();
+  return items.filter((it) => (it.due || 0) <= now).sort((a, b) => (a.due || 0) - (b.due || 0));
 }
 function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
@@ -87,6 +110,8 @@ async function addItem() {
     zh,
     sentence,
     phonetic,
+    box: 0,
+    due: Date.now(),
   };
   items.unshift(item);
   saveItems();
@@ -350,15 +375,21 @@ function currentShownItems() {
   );
 }
 
+let playingId = null;
 function highlightRow(id) {
   clearHighlight();
+  playingId = id;
   const el = document.querySelector('[data-id="' + id + '"]');
   if (el) {
     el.classList.add("playing-row");
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // 只有「單字本」頁顯示時捲動才有效；隱藏時等切回來再捲
+    if (document.getElementById("tab-book").classList.contains("active")) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
 }
 function clearHighlight() {
+  playingId = null;
   document.querySelectorAll(".playing-row").forEach((el) => el.classList.remove("playing-row"));
 }
 
@@ -445,6 +476,9 @@ function render() {
   });
 
   $count.textContent = "共 " + items.length + " 筆";
+  const $tabCount = document.getElementById("tabCount");
+  if ($tabCount) $tabCount.textContent = items.length;
+  updateDueBadge();
   updateBulkBar();
   $empty.classList.toggle("hidden", items.length > 0);
   if (items.length > 0 && shown.length === 0) {
@@ -514,6 +548,92 @@ $loopBtn.addEventListener("click", () => {
   if (isLooping) stopLoop();
   else startLoop();
 });
+
+// ---- 分頁切換 ----
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach((b) =>
+    b.classList.toggle("active", b.dataset.tab === name)
+  );
+  document.querySelectorAll(".tab-page").forEach((p) =>
+    p.classList.toggle("active", p.id === "tab-" + name)
+  );
+  if (name === "review") renderReview();
+  // 切到單字本頁時，若正在循環播放，捲到正在念的那一行
+  if (name === "book" && playingId) {
+    const el = document.querySelector('[data-id="' + playingId + '"]');
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+document.querySelectorAll(".tab-btn").forEach((b) =>
+  b.addEventListener("click", () => switchTab(b.dataset.tab))
+);
+
+// ---- 複習頁 ----
+const $reviewEmpty = document.getElementById("reviewEmpty");
+const $reviewCard = document.getElementById("reviewCard");
+const $rcText = document.getElementById("rcText");
+const $rcPhonetic = document.getElementById("rcPhonetic");
+const $rcZh = document.getElementById("rcZh");
+const $rcReveal = document.getElementById("rcReveal");
+const $rcActions = document.getElementById("rcActions");
+const $rcProgress = document.getElementById("rcProgress");
+let reviewCurrentId = null;
+
+function updateDueBadge() {
+  const $tabDue = document.getElementById("tabDue");
+  if ($tabDue) $tabDue.textContent = dueItems().length;
+}
+
+function renderReview() {
+  const queue = dueItems();
+  updateDueBadge();
+  if (!queue.length) {
+    reviewCurrentId = null;
+    $reviewCard.classList.add("hidden");
+    $reviewEmpty.classList.remove("hidden");
+    return;
+  }
+  $reviewEmpty.classList.add("hidden");
+  $reviewCard.classList.remove("hidden");
+  const it = queue[0];
+  reviewCurrentId = it.id;
+  $rcText.textContent = it.text;
+  if (it.sentence) {
+    $rcPhonetic.textContent = "";
+  } else {
+    $rcPhonetic.textContent = it.phonetic ? "/ " + it.phonetic + " /" : "";
+  }
+  // 蓋住中文，等使用者先回想
+  $rcZh.textContent = it.zh ? "🇹🇼 " + it.zh : "（沒有中文）";
+  $rcZh.classList.add("hidden");
+  $rcActions.classList.add("hidden");
+  $rcReveal.classList.remove("hidden");
+  $rcProgress.textContent = "還剩 " + queue.length + " 個要複習";
+}
+
+function revealAnswer() {
+  $rcZh.classList.remove("hidden");
+  $rcReveal.classList.add("hidden");
+  $rcActions.classList.remove("hidden");
+}
+
+function gradeReview(known) {
+  const it = items.find((x) => x.id === reviewCurrentId);
+  if (it) {
+    it.box = known ? Math.min(it.box + 1, SRS_INTERVALS.length - 1) : 0;
+    it.due = nextDue(it.box);
+    saveItems();
+  }
+  renderReview();
+}
+
+$rcReveal.addEventListener("click", revealAnswer);
+document.getElementById("rcSpeak").addEventListener("click", () => {
+  const it = items.find((x) => x.id === reviewCurrentId);
+  if (it) speak(it.text);
+});
+document.getElementById("rcKnow").addEventListener("click", () => gradeReview(true));
+document.getElementById("rcForgot").addEventListener("click", () => gradeReview(false));
 
 render();
 

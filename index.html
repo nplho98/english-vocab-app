@@ -16,7 +16,14 @@
     <p class="subtitle">單字自動標音標 · 點一下就發音 · 離線本機儲存</p>
   </header>
 
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="add">✏️ 新增</button>
+    <button class="tab-btn" data-tab="review">📅 複習 <span id="tabDue" class="tab-count">0</span></button>
+    <button class="tab-btn" data-tab="book">📚 單字本 <span id="tabCount" class="tab-count">0</span></button>
+  </nav>
+
   <main class="container">
+   <div class="tab-page active" id="tab-add">
     <section class="add-box">
       <div class="add-fields">
         <textarea id="input" rows="2" placeholder="輸入英文單字或句子，例如：apple 或 How are you?"></textarea>
@@ -32,13 +39,11 @@
         <li><b>點擊中文註解可修改</b>：點任一筆的中文，即可手動修改翻譯內容。</li>
         <li>單字會自動標音標；按 🔊 只念英文，循環播放會先念英文再念中文。</li>
         <li>勾選左側方塊可多選，按「🗑️ 刪除選取」一次刪除。</li>
+        <li><b>📅 複習分頁</b>：用「間隔重複法」幫你記單字。每天只丟出<b>到期該複習</b>的單字，一次一張卡，先回想再按「👀 看中文意思」。</li>
+        <li>複習時按 <b>✅ 記得</b> 會把下次間隔拉長（1天→2天→4天→7天→14天）；按 <b>❌ 忘了</b> 則歸零、10 分鐘後再出現。記熟的字會慢慢淡出，模糊的字一直回來找你。</li>
+        <li>分頁鈕上的數字：「📅 複習」顯示今天到期幾個、「📚 單字本」顯示總筆數。</li>
       </ul>
     </details>
-
-    <section class="toolbar">
-      <input id="search" type="search" placeholder="🔍 搜尋已加入的內容…" />
-      <span id="count" class="count">共 0 筆</span>
-    </section>
 
     <section class="controls">
       <button id="loopBtn" class="btn-loop">🔁 循環播放</button>
@@ -70,6 +75,29 @@
         <input id="speed" type="range" min="0.5" max="1.5" step="0.1" value="1" />
       </label>
     </section>
+   </div>
+
+   <div class="tab-page" id="tab-review">
+    <p id="reviewEmpty" class="empty">今天沒有要複習的單字 🎉<br>去「新增」加幾個，或晚點再回來。</p>
+    <div id="reviewCard" class="review-card hidden">
+      <div id="rcText" class="rc-text"></div>
+      <div id="rcPhonetic" class="rc-phonetic"></div>
+      <button id="rcSpeak" class="btn-loop">🔊 發音</button>
+      <div id="rcZh" class="rc-zh hidden"></div>
+      <button id="rcReveal" class="btn-primary rc-full">👀 看中文意思</button>
+      <div id="rcActions" class="rc-actions hidden">
+        <button id="rcForgot" class="btn-del-sel">❌ 忘了</button>
+        <button id="rcKnow" class="btn-loop rc-know">✅ 記得</button>
+      </div>
+      <div id="rcProgress" class="count"></div>
+    </div>
+   </div>
+
+   <div class="tab-page" id="tab-book">
+    <section class="toolbar">
+      <input id="search" type="search" placeholder="🔍 搜尋已加入的內容…" />
+      <span id="count" class="count">共 0 筆</span>
+    </section>
 
     <section id="bulkBar" class="bulk-bar hidden">
       <label class="select-all"><input id="selectAll" type="checkbox" /> 全選</label>
@@ -79,6 +107,7 @@
 
     <ul id="list" class="list"></ul>
     <p id="empty" class="empty">還沒有任何內容，從上面新增第一筆吧！</p>
+   </div>
   </main>
 
   <script src="dict.js"></script>

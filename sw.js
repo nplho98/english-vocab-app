@@ -1,5 +1,5 @@
 // Service Worker — 讓 App 離線也能打開
-const CACHE = "vocab-app-v12";
+const CACHE = "vocab-app-v16";
 const ASSETS = [
   "index.html",
   "style.css",

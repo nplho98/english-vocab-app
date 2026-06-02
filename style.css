@@ -31,6 +31,29 @@ body {
 
 .container { max-width: 640px; margin: 0 auto; padding: 16px; }
 
+/* ---- 分頁 ---- */
+.tabbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; gap: 6px; padding: 8px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  max-width: 640px; margin: 0 auto;
+}
+.tab-btn {
+  flex: 1; border: none; cursor: pointer;
+  background: var(--card); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 10px; font-size: 1rem; font-weight: 700; font-family: inherit;
+}
+.tab-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.tab-count {
+  display: inline-block; min-width: 20px; padding: 0 6px;
+  font-size: 0.75rem; border-radius: 10px;
+  background: rgba(255,255,255,0.25);
+}
+.tab-btn:not(.active) .tab-count { background: var(--bg); color: var(--muted); }
+.tab-page { display: none; }
+.tab-page.active { display: block; }
+
 .add-box {
   display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px;
 }
@@ -117,7 +140,14 @@ body {
 .btn-del-sel:disabled { background: #fca5a5; cursor: not-allowed; }
 
 .list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.item.playing-row { box-shadow: 0 0 0 2px var(--blue); }
+.item.playing-row {
+  box-shadow: 0 0 0 3px var(--blue);
+  background: #eff6ff;
+  border-color: var(--blue);
+}
+.item.playing-row .item-text::before {
+  content: "🔊 "; font-size: 0.95rem;
+}
 .item-check { width: 26px; height: 26px; accent-color: var(--blue); flex-shrink: 0; }
 .item.selected { background: #eff6ff; border-color: #bfdbfe; }
 
@@ -155,3 +185,21 @@ body {
 .empty.hidden { display: none; }
 
 .speaking { box-shadow: 0 0 0 2px var(--blue) inset; }
+
+/* ---- 複習卡片 ---- */
+.review-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 28px 18px; text-align: center; display: flex; flex-direction: column;
+  align-items: center; gap: 14px; margin-top: 8px;
+}
+.review-card.hidden { display: none; }
+.rc-text { font-size: 1.7rem; font-weight: 700; word-break: break-word; }
+.rc-phonetic { color: var(--blue); font-family: "Times New Roman", serif; font-size: 1.05rem; }
+.rc-zh { font-size: 1.2rem; color: var(--text); }
+.rc-zh.hidden { display: none; }
+.rc-full { width: 100%; padding: 14px; }
+.rc-actions { display: flex; gap: 12px; width: 100%; }
+.rc-actions.hidden { display: none; }
+.rc-actions button { flex: 1; padding: 16px; font-size: 1.05rem; }
+.rc-know { background: #dcfce7; color: #15803d; }
+#rcProgress { margin-top: 4px; }

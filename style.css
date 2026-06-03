@@ -84,7 +84,8 @@ body {
 .help ul { margin: 10px 0 4px; padding-left: 18px; color: var(--text); line-height: 1.7; }
 .help li { margin-bottom: 4px; }
 .help b { color: var(--blue); }
-.dev-info ul { list-style: none; padding-left: 0; }
+.dev-title { font-size: 0.95rem; font-weight: 600; color: var(--blue); }
+.dev-info ul { list-style: none; padding-left: 0; margin-top: 10px; }
 .dev-info li { display: flex; gap: 8px; }
 .dev-info a { color: var(--blue); text-decoration: none; }
 .dev-copyright {

@@ -86,7 +86,11 @@ body {
 .help b { color: var(--blue); }
 .dev-title { font-size: 0.95rem; font-weight: 600; color: var(--blue); }
 .dev-info ul { list-style: none; padding-left: 0; margin-top: 10px; }
-.dev-info li { display: flex; gap: 8px; }
+.dev-info li { display: block; }
+.dev-info .dev-k {
+  display: inline-block; min-width: 3.6em;
+  /* 三個標籤等寬，後面的冒號就會上下對齊 */
+}
 .dev-info a { color: var(--text); text-decoration: none; }
 .dev-copyright {
   text-align: center; color: var(--muted);

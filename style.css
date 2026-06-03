@@ -87,7 +87,7 @@ body {
 .dev-title { font-size: 0.95rem; font-weight: 600; color: var(--blue); }
 .dev-info ul { list-style: none; padding-left: 0; margin-top: 10px; }
 .dev-info li { display: flex; gap: 8px; }
-.dev-info a { color: var(--blue); text-decoration: none; }
+.dev-info a { color: var(--text); text-decoration: none; }
 .dev-copyright {
   text-align: center; color: var(--muted);
   font-size: 0.75rem; margin-top: 8px;

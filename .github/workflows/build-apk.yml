@@ -40,9 +40,9 @@ jobs:
       - name: Decode signing keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > signing.keystore
 
-      - name: Bump version code (每次執行遞增，才能覆蓋更新)
+      - name: Bump version code (僅 versionCode 遞增；versionName 沿用 twa-manifest 的固定版號)
         run: |
-          node -e "const fs=require('fs');const f='twa-manifest.json';const m=JSON.parse(fs.readFileSync(f));m.appVersionCode=10+Number(process.env.GITHUB_RUN_NUMBER);m.appVersionName='1.'+process.env.GITHUB_RUN_NUMBER;fs.writeFileSync(f,JSON.stringify(m,null,2));console.log('versionCode =',m.appVersionCode)"
+          node -e "const fs=require('fs');const f='twa-manifest.json';const m=JSON.parse(fs.readFileSync(f));m.appVersionCode=10+Number(process.env.GITHUB_RUN_NUMBER);fs.writeFileSync(f,JSON.stringify(m,null,2));console.log('versionCode =',m.appVersionCode,'versionName =',m.appVersionName)"
 
       - name: Generate Android project from twa-manifest.json
         run: bubblewrap update --skipVersionUpgrade

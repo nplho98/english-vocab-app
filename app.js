@@ -2,7 +2,6 @@
 const STORAGE_KEY = "my_vocab_items_v1";
 
 const $input = document.getElementById("input");
-const $inputZh = document.getElementById("inputZh");
 const $addBtn = document.getElementById("addBtn");
 const $list = document.getElementById("list");
 const $empty = document.getElementById("empty");
@@ -146,8 +145,8 @@ async function addItem() {
   const sentence = isSentence(text);
   const phonetic = sentence ? null : lookupPhonetic(text);
 
-  // 中文：手動填 > 離線表 > 線上翻譯
-  let zh = $inputZh.value.trim() || lookupZh(text) || "";
+  // 中文：離線表 > 線上翻譯（自動帶入，之後可在單字本點中文修改）
+  let zh = lookupZh(text) || "";
 
   const item = {
     id: Date.now() + "-" + Math.random().toString(36).slice(2, 6),
@@ -161,8 +160,6 @@ async function addItem() {
   items.unshift(item);
   saveItems();
   $input.value = "";
-  $inputZh.value = "";
-  zhAutoFilled = true;
   $input.focus();
   render();
 
@@ -554,21 +551,6 @@ $input.addEventListener("keydown", (e) => {
   }
 });
 $search.addEventListener("input", render);
-
-// 英文輸入後自動帶入中文（若中文格還空著、或之前是自動帶入的就更新；手動改過就不覆蓋）
-let zhAutoFilled = true;
-$inputZh.addEventListener("input", () => { zhAutoFilled = false; });
-function autoFillZh() {
-  if (!zhAutoFilled && $inputZh.value.trim() !== "") return;
-  const guess = lookupZh($input.value.trim());
-  $inputZh.value = guess || "";
-  zhAutoFilled = true;
-}
-$input.addEventListener("blur", autoFillZh);
-$input.addEventListener("input", () => {
-  // 邊打邊試著帶入（只在使用者沒手動改過中文時）
-  if (zhAutoFilled) autoFillZh();
-});
 
 // 語速滑桿：即時套用到單筆播放與循環播放
 function applySpeedLabel() { $speedVal.textContent = speechRate.toFixed(1) + "×"; }

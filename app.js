@@ -94,6 +94,51 @@ async function translateOnline(text) {
   return null;
 }
 
+// ---- 線上查音標（離線表查不到時的後援；沒網路就回 null）----
+async function fetchPhoneticOnline(word) {
+  try {
+    const url =
+      "https://api.dictionaryapi.dev/api/v2/entries/en/" +
+      encodeURIComponent(word.trim().toLowerCase());
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data)) return null;
+    for (const entry of data) {
+      // 先找 phonetics 陣列裡有文字的（去掉前後的 / [ ]）
+      if (Array.isArray(entry.phonetics)) {
+        const hit = entry.phonetics.find((p) => p && p.text && p.text.trim());
+        if (hit) return hit.text.replace(/[\/\[\]]/g, "").trim();
+      }
+      if (entry.phonetic) return entry.phonetic.replace(/[\/\[\]]/g, "").trim();
+    }
+  } catch (e) { /* 放棄 */ }
+  return null;
+}
+
+// ---- 背景補齊：查無音標的單字逐一上網補回（已試過的不再重複打 API）----
+let backfilling = false;
+async function backfillPhonetics() {
+  if (backfilling) return;
+  backfilling = true;
+  try {
+    const targets = items.filter((it) => !it.sentence && !it.phonetic && !it.phoneticTried);
+    for (const it of targets) {
+      if (!items.some((x) => x.id === it.id)) continue; // 可能已被刪
+      const ph = await fetchPhoneticOnline(it.text);
+      if (items.some((x) => x.id === it.id)) {
+        if (ph) it.phonetic = ph;
+        it.phoneticTried = true; // 標記已查過，避免每次開啟重打
+        saveItems();
+        render();
+      }
+      await new Promise((r) => setTimeout(r, 300)); // 別打太快
+    }
+  } finally {
+    backfilling = false;
+  }
+}
+
 // ---- 新增 ----
 async function addItem() {
   const text = $input.value.trim();
@@ -131,6 +176,17 @@ async function addItem() {
     }
     markTranslating(item.id, false);
     render();
+  }
+
+  // 若是單字但離線表查不到音標，背景上網查，查到再補上
+  if (!sentence && !item.phonetic && !item.phoneticTried) {
+    const ph = await fetchPhoneticOnline(text);
+    if (items.some((it) => it.id === item.id)) {
+      if (ph) item.phonetic = ph;
+      item.phoneticTried = true;
+      saveItems();
+      render();
+    }
   }
 }
 
@@ -636,6 +692,9 @@ document.getElementById("rcKnow").addEventListener("click", () => gradeReview(tr
 document.getElementById("rcForgot").addEventListener("click", () => gradeReview(false));
 
 render();
+
+// 開啟時背景補齊舊資料中查無音標的單字（沒網路會自動略過）
+backfillPhonetics();
 
 // ---- 註冊離線快取（PWA）----
 if ("serviceWorker" in navigator) {

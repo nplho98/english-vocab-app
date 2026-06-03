@@ -1,6 +1,7 @@
 // Service Worker — 讓 App 離線也能打開
-const CACHE = "vocab-app-v1.2.1";
+const CACHE = "vocab-app-v1.2.2";
 const ASSETS = [
+  "./",
   "index.html",
   "style.css",
   "dict.js",
@@ -24,6 +25,12 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request))
+    caches.match(e.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(e.request).catch(() => {
+        // 離線且快取沒命中：導覽請求一律回退到已快取的 index.html
+        if (e.request.mode === "navigate") return caches.match("index.html");
+      });
+    })
   );
 });

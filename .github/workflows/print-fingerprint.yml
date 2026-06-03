@@ -1,0 +1,18 @@
+name: Print Fingerprint
+on:
+  workflow_dispatch:
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Decode signing keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > signing.keystore
+      - name: Print SHA-256 fingerprint
+        run: |
+          keytool -list -v -keystore signing.keystore -alias my-key-alias -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -iE "SHA256:|SHA-256:"

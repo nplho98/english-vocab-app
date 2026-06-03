@@ -45,19 +45,6 @@
       </ul>
     </details>
 
-    <section class="controls">
-      <button id="loopBtn" class="btn-loop">🔁 循環播放</button>
-      <label class="scope">
-        播放範圍
-        <select id="loopScope">
-          <option value="all">全部</option>
-          <option value="word">只單字</option>
-          <option value="sentence">只句子</option>
-          <option value="checked">只播勾選的</option>
-        </select>
-      </label>
-    </section>
-
     <details class="help" id="voiceSettings">
       <summary>🔊 語音設定（選喜歡的聲音）</summary>
       <label class="voice-row">英文發音
@@ -107,6 +94,19 @@
     <section class="toolbar">
       <input id="search" type="search" placeholder="🔍 搜尋已加入的內容…" />
       <span id="count" class="count">共 0 筆</span>
+    </section>
+
+    <section class="controls">
+      <button id="loopBtn" class="btn-loop">🔁 循環播放</button>
+      <label class="scope">
+        播放範圍
+        <select id="loopScope">
+          <option value="all">全部</option>
+          <option value="word">只單字</option>
+          <option value="sentence">只句子</option>
+          <option value="checked">只播勾選的</option>
+        </select>
+      </label>
     </section>
 
     <section id="bulkBar" class="bulk-bar hidden">

@@ -328,9 +328,18 @@ function renderFolders() {
     const name = document.createElement("span");
     name.className = "folder-name";
     name.textContent = f.name + " (" + count + ")";
-    name.title = "點一下可修改資料夾名稱";
-    name.onclick = () => renameFolder(f.id);
+    name.title = "點一下＝勾選/取消這個資料夾";
+    name.onclick = () => {
+      check.checked = !check.checked;
+      toggleFolderChecked(f.id, check.checked);
+    };
     chip.appendChild(name);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "folder-edit";
+    editBtn.textContent = "✏️";
+    editBtn.onclick = (e) => { e.stopPropagation(); renameFolder(f.id); };
+    chip.appendChild(editBtn);
 
     const delBtn = document.createElement("button");
     delBtn.className = "folder-del";

@@ -54,6 +54,24 @@ function genId() {
   return Date.now() + "-" + Math.random().toString(36).slice(2, 6);
 }
 
+// 鏡頭翻譯要用的 OCR 引擎，等真正拍照才動態載入，不拖慢 App 開啟速度
+let tesseractLoadPromise = null;
+function loadTesseract() {
+  if (typeof Tesseract !== "undefined") return Promise.resolve();
+  if (tesseractLoadPromise) return tesseractLoadPromise;
+  tesseractLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => {
+      tesseractLoadPromise = null;
+      reject(new Error("tesseract-load-failed"));
+    };
+    document.body.appendChild(script);
+  });
+  return tesseractLoadPromise;
+}
+
 // ---- 資料夾 ----
 function loadFolders() {
   try {
@@ -1108,10 +1126,7 @@ $cameraInput.addEventListener("change", async () => {
   $cameraStatus.textContent = "🔍 辨識中…（第一次使用需要下載辨識引擎，請耐心等候）";
 
   try {
-    if (typeof Tesseract === "undefined") {
-      $cameraStatus.textContent = "辨識引擎載入失敗，請確認網路連線後再試一次。";
-      return;
-    }
+    await loadTesseract();
     const result = await Tesseract.recognize(file, "eng");
     const text = (result.data.text || "").replace(/\s+/g, " ").trim();
     if (!text) {
@@ -1133,7 +1148,10 @@ $cameraInput.addEventListener("change", async () => {
     }
   } catch (e) {
     $cameraStatus.classList.remove("hidden");
-    $cameraStatus.textContent = "辨識失敗，請再試一次。";
+    $cameraStatus.textContent =
+      e && e.message === "tesseract-load-failed"
+        ? "辨識引擎載入失敗，請確認網路連線後再試一次。"
+        : "辨識失敗，請再試一次。";
   } finally {
     $cameraInput.value = "";
   }

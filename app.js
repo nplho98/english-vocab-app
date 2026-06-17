@@ -72,6 +72,23 @@ function loadTesseract() {
   return tesseractLoadPromise;
 }
 
+// Tesseract 預設的版面分析假設是「一整頁文件」（多欄、多段落），拿來辨識一張照片裡單行/單句
+// 的文字常常會被切錯而認成亂碼；改成「整張當一個文字區塊」對招牌/標籤/單句這種情境準確率好很多
+let tesseractWorkerPromise = null;
+async function getTesseractWorker() {
+  if (tesseractWorkerPromise) return tesseractWorkerPromise;
+  tesseractWorkerPromise = (async () => {
+    await loadTesseract();
+    const worker = await Tesseract.createWorker("eng");
+    await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK });
+    return worker;
+  })();
+  tesseractWorkerPromise.catch(() => {
+    tesseractWorkerPromise = null;
+  });
+  return tesseractWorkerPromise;
+}
+
 // ---- 資料夾 ----
 function loadFolders() {
   try {
@@ -1137,8 +1154,8 @@ $cameraInput.addEventListener("change", async () => {
   $cameraStatus.textContent = "🔍 辨識中…（第一次使用需要下載辨識引擎，請耐心等候）";
 
   try {
-    await loadTesseract();
-    const result = await Tesseract.recognize(file, "eng");
+    const worker = await getTesseractWorker();
+    const result = await worker.recognize(file);
     const text = (result.data.text || "").replace(/\s+/g, " ").trim();
     if (!text) {
       $cameraStatus.textContent = "沒有辨識到文字，換一張清楚一點的照片再試試。";

@@ -26,9 +26,6 @@
     <button id="importBtn" class="sub-btn">📥 匯入</button>
     <button id="flashcardBtn" class="sub-btn">🃏 單字卡</button>
   </nav>
-  <nav class="subbar">
-    <button id="cameraBtn" class="sub-btn" disabled>📷 鏡頭翻譯</button>
-  </nav>
   <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
 
   <main class="container">
@@ -91,7 +88,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.5.2</li>
+        <li><b class="dev-k">版本</b>：v1.6.0</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
@@ -137,24 +134,6 @@
 
     <ul id="list" class="list"></ul>
     <p id="empty" class="empty">還沒有任何內容，從上面新增第一筆吧！</p>
-   </div>
-
-   <div class="tab-page" id="tab-camera">
-    <section class="add-box tool-box">
-      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" />
-      <button id="cameraCaptureBtn" class="btn-primary tool-btn">📷 拍照辨識</button>
-
-      <img id="cameraPreview" class="camera-preview hidden" alt="拍攝的照片" />
-      <p id="cameraStatus" class="empty hidden"></p>
-      <div id="cameraResult" class="lookup-result hidden">
-        <div id="cameraResultEn" class="lookup-en"></div>
-        <div id="cameraResultZh" class="lookup-zh"></div>
-      </div>
-
-      <p id="cameraNoFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能加入單字本。</p>
-      <select id="cameraFolderSelect" class="folder-select hidden"></select>
-      <button id="cameraAddBtn" class="btn-loop tool-btn hidden">＋ 加入單字本</button>
-    </section>
    </div>
   </main>
 

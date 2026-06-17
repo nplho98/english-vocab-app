@@ -27,60 +27,14 @@ const $importBtn = document.getElementById("importBtn");
 const $importFile = document.getElementById("importFile");
 const $flashcardBtn = document.getElementById("flashcardBtn");
 const $printSheet = document.getElementById("printSheet");
-const $cameraBtn = document.getElementById("cameraBtn");
 const $addToBookBtn = document.getElementById("addToBookBtn");
 const $lookupResult = document.getElementById("lookupResult");
 const $lookupResultEn = document.getElementById("lookupResultEn");
 const $lookupResultPh = document.getElementById("lookupResultPh");
 const $lookupResultZh = document.getElementById("lookupResultZh");
-const $cameraInput = document.getElementById("cameraInput");
-const $cameraCaptureBtn = document.getElementById("cameraCaptureBtn");
-const $cameraPreview = document.getElementById("cameraPreview");
-const $cameraStatus = document.getElementById("cameraStatus");
-const $cameraResult = document.getElementById("cameraResult");
-const $cameraResultEn = document.getElementById("cameraResultEn");
-const $cameraResultZh = document.getElementById("cameraResultZh");
-const $cameraFolderSelect = document.getElementById("cameraFolderSelect");
-const $cameraNoFolderNotice = document.getElementById("cameraNoFolderNotice");
-const $cameraAddBtn = document.getElementById("cameraAddBtn");
 
 function genId() {
   return Date.now() + "-" + Math.random().toString(36).slice(2, 6);
-}
-
-// 鏡頭翻譯要用的 OCR 引擎，等真正拍照才動態載入，不拖慢 App 開啟速度
-let tesseractLoadPromise = null;
-function loadTesseract() {
-  if (typeof Tesseract !== "undefined") return Promise.resolve();
-  if (tesseractLoadPromise) return tesseractLoadPromise;
-  tesseractLoadPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-    script.onload = () => resolve();
-    script.onerror = () => {
-      tesseractLoadPromise = null;
-      reject(new Error("tesseract-load-failed"));
-    };
-    document.body.appendChild(script);
-  });
-  return tesseractLoadPromise;
-}
-
-// Tesseract 預設的版面分析假設是「一整頁文件」（多欄、多段落），拿來辨識一張照片裡單行/單句
-// 的文字常常會被切錯而認成亂碼；改成「整張當一個文字區塊」對招牌/標籤/單句這種情境準確率好很多
-let tesseractWorkerPromise = null;
-async function getTesseractWorker() {
-  if (tesseractWorkerPromise) return tesseractWorkerPromise;
-  tesseractWorkerPromise = (async () => {
-    await loadTesseract();
-    const worker = await Tesseract.createWorker("eng");
-    await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK });
-    return worker;
-  })();
-  tesseractWorkerPromise.catch(() => {
-    tesseractWorkerPromise = null;
-  });
-  return tesseractWorkerPromise;
 }
 
 // ---- 資料夾 ----
@@ -100,7 +54,6 @@ let items = loadItems();
 const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放」「單字卡」用
 const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
 let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
-let cameraCurrent = null; // 鏡頭翻譯目前辨識出來的結果 { text, zh }
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
 // 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
@@ -364,18 +317,6 @@ function renderAddFolderSelect() {
   $addToBookBtn.classList.toggle("hidden", !lookupCurrent);
   $addToBookBtn.disabled = !hasFolders || !lookupCurrent;
   if (hasFolders) fillFolderOptions($folderSelect);
-
-  renderCameraFolderUI();
-}
-
-// 「鏡頭翻譯」分頁的資料夾選單與「加入單字本」鈕狀態
-function renderCameraFolderUI() {
-  const hasFolders = folders.length > 0;
-  $cameraNoFolderNotice.classList.toggle("hidden", hasFolders);
-  $cameraFolderSelect.classList.toggle("hidden", !hasFolders);
-  $cameraAddBtn.classList.toggle("hidden", !cameraCurrent);
-  $cameraAddBtn.disabled = !hasFolders || !cameraCurrent;
-  if (hasFolders) fillFolderOptions($cameraFolderSelect);
 }
 
 // 點中文可修改
@@ -620,6 +561,16 @@ function render() {
     li.className = "item" + (selectedIds.has(it.id) ? " selected" : "");
     li.dataset.id = it.id;
 
+    const moveBox = document.createElement("div");
+    moveBox.className = "item-move";
+
+    const upBtn = document.createElement("button");
+    upBtn.className = "move-btn";
+    upBtn.textContent = "▲";
+    upBtn.title = "往上移";
+    upBtn.disabled = idx === 0;
+    upBtn.onclick = () => moveItem(it.id, "up");
+
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "item-check";
@@ -630,23 +581,15 @@ function render() {
       li.classList.toggle("selected", check.checked);
       updateBulkBar();
     };
-    li.appendChild(check);
 
-    const moveBox = document.createElement("div");
-    moveBox.className = "item-move";
-    const upBtn = document.createElement("button");
-    upBtn.className = "move-btn";
-    upBtn.textContent = "▲";
-    upBtn.title = "往上移";
-    upBtn.disabled = idx === 0;
-    upBtn.onclick = () => moveItem(it.id, "up");
     const downBtn = document.createElement("button");
     downBtn.className = "move-btn";
     downBtn.textContent = "▼";
     downBtn.title = "往下移";
     downBtn.disabled = idx === shown.length - 1;
     downBtn.onclick = () => moveItem(it.id, "down");
-    moveBox.append(upBtn, downBtn);
+
+    moveBox.append(upBtn, check, downBtn);
     li.appendChild(moveBox);
 
     const main = document.createElement("div");
@@ -1016,90 +959,6 @@ $input.addEventListener("input", () => {
   }
 });
 $addToBookBtn.addEventListener("click", addToBook);
-
-// ---- 鏡頭翻譯：拍照→本機 OCR 辨識→翻譯，可選擇加入單字本 ----
-function renderCameraResult() {
-  if (!cameraCurrent) {
-    $cameraResult.classList.add("hidden");
-    return;
-  }
-  $cameraResult.classList.remove("hidden");
-  $cameraResultEn.textContent = cameraCurrent.text;
-  $cameraResultZh.textContent = cameraCurrent.zh ? "🇹🇼 " + cameraCurrent.zh : "🌐 翻譯中…";
-}
-
-function addCameraToBook() {
-  if (!cameraCurrent || !folders.length) return;
-  const sentence = isSentence(cameraCurrent.text);
-  const phonetic = sentence ? null : lookupPhonetic(cameraCurrent.text);
-  const folderId = folders.some((f) => f.id === $cameraFolderSelect.value)
-    ? $cameraFolderSelect.value
-    : folders[0].id;
-  localStorage.setItem("last_folder_id", folderId);
-  checkedFolderIds.add(folderId);
-  items.unshift({
-    id: genId(),
-    text: cameraCurrent.text,
-    zh: cameraCurrent.zh || "",
-    sentence,
-    phonetic,
-    folderId,
-    box: 0,
-    due: Date.now(),
-  });
-  saveItems();
-  render();
-  alert("已加入單字本！");
-}
-
-$cameraCaptureBtn.addEventListener("click", () => $cameraInput.click());
-$cameraInput.addEventListener("change", async () => {
-  const file = $cameraInput.files[0];
-  if (!file) return;
-
-  $cameraPreview.src = URL.createObjectURL(file);
-  $cameraPreview.classList.remove("hidden");
-  cameraCurrent = null;
-  renderCameraResult();
-  renderCameraFolderUI();
-  $cameraStatus.classList.remove("hidden");
-  $cameraStatus.textContent = "🔍 辨識中…（第一次使用需要下載辨識引擎，請耐心等候）";
-
-  try {
-    const worker = await getTesseractWorker();
-    const result = await worker.recognize(file);
-    const text = (result.data.text || "").replace(/\s+/g, " ").trim();
-    if (!text) {
-      $cameraStatus.textContent = "沒有辨識到文字，換一張清楚一點的照片再試試。";
-      return;
-    }
-    $cameraStatus.classList.add("hidden");
-    const zh = lookupZh(text) || "";
-    cameraCurrent = { text, zh };
-    renderCameraResult();
-    renderCameraFolderUI();
-
-    if (!zh) {
-      const online = await translateOnline(text);
-      if (online && cameraCurrent && cameraCurrent.text === text) {
-        cameraCurrent.zh = online;
-        renderCameraResult();
-      }
-    }
-  } catch (e) {
-    $cameraStatus.classList.remove("hidden");
-    $cameraStatus.textContent =
-      e && e.message === "tesseract-load-failed"
-        ? "辨識引擎載入失敗，請確認網路連線後再試一次。"
-        : "辨識失敗，請再試一次。";
-  } finally {
-    $cameraInput.value = "";
-  }
-});
-$cameraAddBtn.addEventListener("click", addCameraToBook);
-
-// 鏡頭翻譯 分頁切換事件
-$cameraBtn.addEventListener("click", () => switchTab("camera"));
 
 // 循環播放開關
 $loopBtn.addEventListener("click", () => {

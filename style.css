@@ -80,10 +80,6 @@ body {
 
 .tool-box { flex-direction: column; }
 .tool-btn { width: 100%; padding: 14px; }
-.camera-preview {
-  width: 100%; max-height: 240px; object-fit: contain;
-  border-radius: 12px; border: 1px solid var(--border); background: var(--bg);
-}
 .lookup-result {
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
   padding: 16px; text-align: center; display: flex; flex-direction: column; gap: 6px;
@@ -210,7 +206,7 @@ body {
 }
 .item-check { width: 26px; height: 26px; accent-color: var(--blue); flex-shrink: 0; }
 .item.selected { background: #eff6ff; border-color: #bfdbfe; }
-.item-move { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.item-move { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 .move-btn {
   width: 28px; height: 28px; border: none; border-radius: 8px;
   background: var(--bg); color: var(--muted); font-size: 0.8rem; cursor: pointer;

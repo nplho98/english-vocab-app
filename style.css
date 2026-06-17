@@ -69,13 +69,28 @@ body {
   display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px;
 }
 .add-fields { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-#input, #inputZh {
+#input, #inputZh, #lookupInput {
   width: 100%; resize: none; padding: 12px; font-size: 1rem;
   border: 1px solid var(--border); border-radius: 12px; background: var(--card);
   font-family: inherit;
 }
-#input:focus, #inputZh:focus { outline: 2px solid var(--blue); border-color: var(--blue); }
+#input:focus, #inputZh:focus, #lookupInput:focus { outline: 2px solid var(--blue); border-color: var(--blue); }
 #inputZh { font-size: 0.95rem; }
+
+.tool-box { flex-direction: column; }
+.tool-btn { width: 100%; padding: 14px; }
+.camera-preview {
+  width: 100%; max-height: 240px; object-fit: contain;
+  border-radius: 12px; border: 1px solid var(--border); background: var(--bg);
+}
+.lookup-result {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; text-align: center; display: flex; flex-direction: column; gap: 6px;
+}
+.lookup-result.hidden { display: none; }
+.lookup-en { font-size: 1.4rem; font-weight: 700; word-break: break-word; }
+.lookup-ph { color: var(--blue); font-family: "Times New Roman", serif; font-size: 1rem; }
+.lookup-zh { font-size: 1.1rem; color: var(--text); }
 
 .btn-primary {
   background: var(--blue); color: #fff; border: none; border-radius: 12px;

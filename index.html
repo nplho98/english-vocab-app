@@ -26,6 +26,10 @@
     <button id="importBtn" class="sub-btn">📥 匯入</button>
     <button id="flashcardBtn" class="sub-btn">🃏 單字卡</button>
   </nav>
+  <nav class="subbar">
+    <button id="cameraBtn" class="sub-btn">📷 鏡頭翻譯</button>
+    <button id="lookupBtn" class="sub-btn">🔍 快速查詢</button>
+  </nav>
   <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
 
   <main class="container">
@@ -71,6 +75,8 @@
         <li>勾選左側方塊可多選，按「🗑️ 刪除選取」只會刪除目前清單裡勾選的那幾筆，不會動到資料夾本身。</li>
         <li><b>📤 匯出 / 📥 匯入</b>：匯出會把目前的資料夾跟內容打包成備份檔，可以傳給其他用這個 App 的人；匯入時會合併進你自己的資料夾（同名合併、不同名新建），同一筆單字/句子已存在就更新翻譯和音標，但不會動到你自己的複習進度。</li>
         <li><b>🃏 單字卡</b>：在單字本勾選想要的單字/句子，按「🃏 單字卡」會排成適合列印的小卡版面，可直接列印或存成 PDF。</li>
+        <li><b>🔍 快速查詢</b>：打字輸入字/句立刻看翻譯，跟「新增」分開、單純查詢用，查完可以選資料夾再按「加入單字本」存起來。</li>
+        <li><b>📷 鏡頭翻譯</b>：拍一張英文文字的照片，App 用本機文字辨識自動讀出文字並翻譯，可以選資料夾加入單字本。第一次使用需要網路下載辨識引擎；免費辨識遇到模糊照片或複雜背景容易認錯字。</li>
         <li><b>📅 複習分頁</b>：用「間隔重複法」幫你記單字。每天只丟出<b>到期該複習</b>的單字，一次一張卡，先回想再按「👀 看中文意思」。</li>
         <li>複習時按 <b>✅ 記得</b> 會把下次間隔拉長（1天→2天→4天→7天→14天）；按 <b>❌ 忘了</b> 則歸零、10 分鐘後再出現。記熟的字會慢慢淡出，模糊的字一直回來找你。</li>
         <li>分頁鈕上的數字：「📅 複習」顯示今天到期幾個、「📚 單字本」顯示總筆數。</li>
@@ -82,7 +88,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.3.0</li>
+        <li><b class="dev-k">版本</b>：v1.4.0</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
@@ -137,11 +143,48 @@
     <ul id="list" class="list"></ul>
     <p id="empty" class="empty">還沒有任何內容，從上面新增第一筆吧！</p>
    </div>
+
+   <div class="tab-page" id="tab-lookup">
+    <section class="add-box tool-box">
+      <textarea id="lookupInput" rows="2" placeholder="輸入英文單字或句子，立刻看翻譯"></textarea>
+      <button id="lookupGoBtn" class="btn-primary tool-btn">🔍 查詢翻譯</button>
+
+      <div id="lookupResult" class="lookup-result hidden">
+        <div id="lookupResultEn" class="lookup-en"></div>
+        <div id="lookupResultPh" class="lookup-ph"></div>
+        <div id="lookupResultZh" class="lookup-zh"></div>
+      </div>
+
+      <p id="lookupNoFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能加入單字本。</p>
+      <select id="lookupFolderSelect" class="folder-select hidden"></select>
+      <button id="lookupAddBtn" class="btn-loop tool-btn hidden">＋ 加入單字本</button>
+    </section>
+   </div>
+
+   <div class="tab-page" id="tab-camera">
+    <section class="add-box tool-box">
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" />
+      <button id="cameraCaptureBtn" class="btn-primary tool-btn">📷 拍照辨識</button>
+      <p class="empty">拍英文文字的照片（書、招牌、包裝都可以），辨識完會自動翻譯。第一次使用需要下載辨識引擎，請先確保有網路。</p>
+
+      <img id="cameraPreview" class="camera-preview hidden" alt="拍攝的照片" />
+      <p id="cameraStatus" class="empty hidden"></p>
+      <div id="cameraResult" class="lookup-result hidden">
+        <div id="cameraResultEn" class="lookup-en"></div>
+        <div id="cameraResultZh" class="lookup-zh"></div>
+      </div>
+
+      <p id="cameraNoFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能加入單字本。</p>
+      <select id="cameraFolderSelect" class="folder-select hidden"></select>
+      <button id="cameraAddBtn" class="btn-loop tool-btn hidden">＋ 加入單字本</button>
+    </section>
+   </div>
   </main>
 
   <div id="printSheet" class="print-sheet"></div>
 
   <script src="dict.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

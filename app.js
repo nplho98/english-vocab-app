@@ -28,6 +28,27 @@ const $importBtn = document.getElementById("importBtn");
 const $importFile = document.getElementById("importFile");
 const $flashcardBtn = document.getElementById("flashcardBtn");
 const $printSheet = document.getElementById("printSheet");
+const $cameraBtn = document.getElementById("cameraBtn");
+const $lookupBtn = document.getElementById("lookupBtn");
+const $lookupInput = document.getElementById("lookupInput");
+const $lookupGoBtn = document.getElementById("lookupGoBtn");
+const $lookupResult = document.getElementById("lookupResult");
+const $lookupResultEn = document.getElementById("lookupResultEn");
+const $lookupResultPh = document.getElementById("lookupResultPh");
+const $lookupResultZh = document.getElementById("lookupResultZh");
+const $lookupFolderSelect = document.getElementById("lookupFolderSelect");
+const $lookupNoFolderNotice = document.getElementById("lookupNoFolderNotice");
+const $lookupAddBtn = document.getElementById("lookupAddBtn");
+const $cameraInput = document.getElementById("cameraInput");
+const $cameraCaptureBtn = document.getElementById("cameraCaptureBtn");
+const $cameraPreview = document.getElementById("cameraPreview");
+const $cameraStatus = document.getElementById("cameraStatus");
+const $cameraResult = document.getElementById("cameraResult");
+const $cameraResultEn = document.getElementById("cameraResultEn");
+const $cameraResultZh = document.getElementById("cameraResultZh");
+const $cameraFolderSelect = document.getElementById("cameraFolderSelect");
+const $cameraNoFolderNotice = document.getElementById("cameraNoFolderNotice");
+const $cameraAddBtn = document.getElementById("cameraAddBtn");
 
 function genId() {
   return Date.now() + "-" + Math.random().toString(36).slice(2, 6);
@@ -49,6 +70,8 @@ let folders = loadFolders();
 let items = loadItems();
 const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放只播勾選的」用
 const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
+let lookupCurrent = null; // 快速查詢目前查到的結果 { text, zh, phonetic, sentence }
+let cameraCurrent = null; // 鏡頭翻譯目前辨識出來的結果 { text, zh }
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
 // 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
@@ -351,6 +374,19 @@ function renderFolders() {
   });
 }
 
+// 資料夾下拉選單共用：把目前的資料夾填進去，預選上次用過的那個
+function fillFolderOptions($select) {
+  const lastId = localStorage.getItem("last_folder_id");
+  $select.innerHTML = "";
+  folders.forEach((f) => {
+    const opt = document.createElement("option");
+    opt.value = f.id;
+    opt.textContent = f.name;
+    $select.appendChild(opt);
+  });
+  if (folders.some((f) => f.id === lastId)) $select.value = lastId;
+}
+
 // 「新增」分頁的資料夾選單：沒有資料夾時鎖住輸入並顯示原因
 function renderAddFolderSelect() {
   const hasFolders = folders.length > 0;
@@ -358,17 +394,30 @@ function renderAddFolderSelect() {
   $folderSelect.classList.toggle("hidden", !hasFolders);
   $input.disabled = !hasFolders;
   $addBtn.disabled = !hasFolders;
-  if (!hasFolders) return;
+  if (hasFolders) fillFolderOptions($folderSelect);
 
-  const lastId = localStorage.getItem("last_folder_id");
-  $folderSelect.innerHTML = "";
-  folders.forEach((f) => {
-    const opt = document.createElement("option");
-    opt.value = f.id;
-    opt.textContent = f.name;
-    $folderSelect.appendChild(opt);
-  });
-  if (folders.some((f) => f.id === lastId)) $folderSelect.value = lastId;
+  renderLookupFolderUI();
+  renderCameraFolderUI();
+}
+
+// 「快速查詢」分頁的資料夾選單與「加入單字本」鈕狀態
+function renderLookupFolderUI() {
+  const hasFolders = folders.length > 0;
+  $lookupNoFolderNotice.classList.toggle("hidden", hasFolders);
+  $lookupFolderSelect.classList.toggle("hidden", !hasFolders);
+  $lookupAddBtn.classList.toggle("hidden", !lookupCurrent);
+  $lookupAddBtn.disabled = !hasFolders || !lookupCurrent;
+  if (hasFolders) fillFolderOptions($lookupFolderSelect);
+}
+
+// 「鏡頭翻譯」分頁的資料夾選單與「加入單字本」鈕狀態
+function renderCameraFolderUI() {
+  const hasFolders = folders.length > 0;
+  $cameraNoFolderNotice.classList.toggle("hidden", hasFolders);
+  $cameraFolderSelect.classList.toggle("hidden", !hasFolders);
+  $cameraAddBtn.classList.toggle("hidden", !cameraCurrent);
+  $cameraAddBtn.disabled = !hasFolders || !cameraCurrent;
+  if (hasFolders) fillFolderOptions($cameraFolderSelect);
 }
 
 // 點中文可修改
@@ -935,6 +984,165 @@ $importFile.addEventListener("change", () => {
   $importFile.value = "";
 });
 $flashcardBtn.addEventListener("click", exportFlashcards);
+
+// ---- 快速查詢：打字輸入，立刻看翻譯，可選擇加入單字本 ----
+function renderLookupResult() {
+  if (!lookupCurrent) {
+    $lookupResult.classList.add("hidden");
+    return;
+  }
+  $lookupResult.classList.remove("hidden");
+  $lookupResultEn.textContent = lookupCurrent.text;
+  $lookupResultPh.textContent = lookupCurrent.sentence
+    ? ""
+    : lookupCurrent.phonetic
+    ? "/ " + lookupCurrent.phonetic + " /"
+    : "（字典查無音標）";
+  $lookupResultZh.textContent = lookupCurrent.zh ? "🇹🇼 " + lookupCurrent.zh : "🌐 翻譯中…";
+}
+
+async function runLookup() {
+  const text = $lookupInput.value.trim();
+  if (!text) return;
+  const sentence = isSentence(text);
+  const phonetic = sentence ? null : lookupPhonetic(text);
+  const zh = lookupZh(text) || "";
+
+  lookupCurrent = { text, zh, phonetic, sentence };
+  renderLookupResult();
+  renderLookupFolderUI();
+
+  if (!zh) {
+    const online = await translateOnline(text);
+    if (online && lookupCurrent && lookupCurrent.text === text) {
+      lookupCurrent.zh = online;
+      renderLookupResult();
+    }
+  }
+  if (!sentence && !phonetic) {
+    const ph = await fetchPhoneticOnline(text);
+    if (ph && lookupCurrent && lookupCurrent.text === text) {
+      lookupCurrent.phonetic = ph;
+      renderLookupResult();
+    }
+  }
+}
+
+function addLookupToBook() {
+  if (!lookupCurrent || !folders.length) return;
+  const folderId = folders.some((f) => f.id === $lookupFolderSelect.value)
+    ? $lookupFolderSelect.value
+    : folders[0].id;
+  localStorage.setItem("last_folder_id", folderId);
+  checkedFolderIds.add(folderId);
+  items.unshift({
+    id: genId(),
+    text: lookupCurrent.text,
+    zh: lookupCurrent.zh || "",
+    sentence: lookupCurrent.sentence,
+    phonetic: lookupCurrent.phonetic || null,
+    folderId,
+    box: 0,
+    due: Date.now(),
+  });
+  saveItems();
+  render();
+  alert("已加入單字本！");
+}
+
+$lookupGoBtn.addEventListener("click", runLookup);
+$lookupInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    runLookup();
+  }
+});
+$lookupAddBtn.addEventListener("click", addLookupToBook);
+
+// ---- 鏡頭翻譯：拍照→本機 OCR 辨識→翻譯，可選擇加入單字本 ----
+function renderCameraResult() {
+  if (!cameraCurrent) {
+    $cameraResult.classList.add("hidden");
+    return;
+  }
+  $cameraResult.classList.remove("hidden");
+  $cameraResultEn.textContent = cameraCurrent.text;
+  $cameraResultZh.textContent = cameraCurrent.zh ? "🇹🇼 " + cameraCurrent.zh : "🌐 翻譯中…";
+}
+
+function addCameraToBook() {
+  if (!cameraCurrent || !folders.length) return;
+  const sentence = isSentence(cameraCurrent.text);
+  const phonetic = sentence ? null : lookupPhonetic(cameraCurrent.text);
+  const folderId = folders.some((f) => f.id === $cameraFolderSelect.value)
+    ? $cameraFolderSelect.value
+    : folders[0].id;
+  localStorage.setItem("last_folder_id", folderId);
+  checkedFolderIds.add(folderId);
+  items.unshift({
+    id: genId(),
+    text: cameraCurrent.text,
+    zh: cameraCurrent.zh || "",
+    sentence,
+    phonetic,
+    folderId,
+    box: 0,
+    due: Date.now(),
+  });
+  saveItems();
+  render();
+  alert("已加入單字本！");
+}
+
+$cameraCaptureBtn.addEventListener("click", () => $cameraInput.click());
+$cameraInput.addEventListener("change", async () => {
+  const file = $cameraInput.files[0];
+  if (!file) return;
+
+  $cameraPreview.src = URL.createObjectURL(file);
+  $cameraPreview.classList.remove("hidden");
+  cameraCurrent = null;
+  renderCameraResult();
+  renderCameraFolderUI();
+  $cameraStatus.classList.remove("hidden");
+  $cameraStatus.textContent = "🔍 辨識中…（第一次使用需要下載辨識引擎，請耐心等候）";
+
+  try {
+    if (typeof Tesseract === "undefined") {
+      $cameraStatus.textContent = "辨識引擎載入失敗，請確認網路連線後再試一次。";
+      return;
+    }
+    const result = await Tesseract.recognize(file, "eng");
+    const text = (result.data.text || "").replace(/\s+/g, " ").trim();
+    if (!text) {
+      $cameraStatus.textContent = "沒有辨識到文字，換一張清楚一點的照片再試試。";
+      return;
+    }
+    $cameraStatus.classList.add("hidden");
+    const zh = lookupZh(text) || "";
+    cameraCurrent = { text, zh };
+    renderCameraResult();
+    renderCameraFolderUI();
+
+    if (!zh) {
+      const online = await translateOnline(text);
+      if (online && cameraCurrent && cameraCurrent.text === text) {
+        cameraCurrent.zh = online;
+        renderCameraResult();
+      }
+    }
+  } catch (e) {
+    $cameraStatus.classList.remove("hidden");
+    $cameraStatus.textContent = "辨識失敗，請再試一次。";
+  } finally {
+    $cameraInput.value = "";
+  }
+});
+$cameraAddBtn.addEventListener("click", addCameraToBook);
+
+// 鏡頭翻譯／快速查詢 分頁切換事件
+$cameraBtn.addEventListener("click", () => switchTab("camera"));
+$lookupBtn.addEventListener("click", () => switchTab("lookup"));
 
 // 循環播放開關
 $loopBtn.addEventListener("click", () => {

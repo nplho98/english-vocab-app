@@ -1075,6 +1075,13 @@ $lookupInput.addEventListener("keydown", (e) => {
     runLookup();
   }
 });
+$lookupInput.addEventListener("input", () => {
+  if (!$lookupInput.value.trim()) {
+    lookupCurrent = null;
+    renderLookupResult();
+    renderLookupFolderUI();
+  }
+});
 $lookupAddBtn.addEventListener("click", addLookupToBook);
 
 // ---- 鏡頭翻譯：拍照→本機 OCR 辨識→翻譯，可選擇加入單字本 ----

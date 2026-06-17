@@ -54,7 +54,20 @@ function saveFolders() {
 
 let folders = loadFolders();
 let items = loadItems();
-const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放」「單字卡」用
+
+// 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放」「單字卡」用；存進 localStorage，關閉 App 不會忘記
+const SELECTED_IDS_KEY = "my_vocab_selected_ids_v1";
+function loadSelectedIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SELECTED_IDS_KEY)) || []);
+  } catch {
+    return new Set();
+  }
+}
+function saveSelectedIds() {
+  localStorage.setItem(SELECTED_IDS_KEY, JSON.stringify([...selectedIds]));
+}
+const selectedIds = loadSelectedIds();
 
 // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）；存進 localStorage，關閉 App 不會忘記
 const CHECKED_FOLDERS_KEY = "my_vocab_checked_folders_v1";
@@ -195,6 +208,7 @@ function updateBulkBar() {
   for (const id of [...selectedIds]) {
     if (!items.some((it) => it.id === id)) selectedIds.delete(id);
   }
+  saveSelectedIds();
   $bulkBar.classList.toggle("hidden", items.length === 0);
   $selCount.textContent = "已選 " + selectedIds.size + " 筆";
   $delSelBtn.disabled = selectedIds.size === 0;

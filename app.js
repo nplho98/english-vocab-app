@@ -762,6 +762,9 @@ function render() {
       main.appendChild(zh);
     }
 
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
+
     const speakBtn = document.createElement("button");
     speakBtn.className = "icon-btn speak-btn";
     speakBtn.textContent = "🔊";
@@ -776,7 +779,8 @@ function render() {
       if (confirm("確定刪除「" + it.text + "」？")) deleteItem(it.id);
     };
 
-    li.append(main, speakBtn, delBtn);
+    actions.append(speakBtn, delBtn);
+    li.append(main, actions);
     $list.appendChild(li);
   });
 

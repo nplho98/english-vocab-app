@@ -17,7 +17,7 @@
   </header>
 
   <nav class="tabbar">
-    <button class="tab-btn active" data-tab="add">✏️ 新增</button>
+    <button class="tab-btn active" data-tab="add">🔍 查詢</button>
     <button class="tab-btn" data-tab="review">📅 複習 <span id="tabDue" class="tab-count">0</span></button>
     <button class="tab-btn" data-tab="book">📚 單字本 <span id="tabCount" class="tab-count">0</span></button>
   </nav>
@@ -27,20 +27,25 @@
     <button id="flashcardBtn" class="sub-btn">🃏 單字卡</button>
   </nav>
   <nav class="subbar">
-    <button id="cameraBtn" class="sub-btn">📷 鏡頭翻譯</button>
-    <button id="lookupBtn" class="sub-btn">🔍 快速查詢</button>
+    <button id="cameraBtn" class="sub-btn" disabled>📷 鏡頭翻譯</button>
   </nav>
   <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
 
   <main class="container">
    <div class="tab-page active" id="tab-add">
-    <p id="noFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能新增單字或句子。</p>
-    <section class="add-box">
-      <div class="add-fields">
-        <select id="folderSelect" class="folder-select hidden"></select>
-        <textarea id="input" rows="2" placeholder="輸入英文單字或句子，例如：apple 或 How are you?"></textarea>
+    <section class="add-box tool-box">
+      <textarea id="input" rows="2" placeholder="輸入英文單字或句子，例如：apple 或 How are you?"></textarea>
+      <button id="addBtn" class="btn-primary tool-btn">🔍 查詢</button>
+
+      <div id="lookupResult" class="lookup-result hidden">
+        <div id="lookupResultEn" class="lookup-en"></div>
+        <div id="lookupResultPh" class="lookup-ph"></div>
+        <div id="lookupResultZh" class="lookup-zh editable"></div>
       </div>
-      <button id="addBtn" class="btn-primary">＋ 新增</button>
+
+      <p id="noFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能加入單字本。</p>
+      <select id="folderSelect" class="folder-select hidden"></select>
+      <button id="addToBookBtn" class="btn-loop tool-btn hidden">➕ 加入單字本</button>
     </section>
 
     <details class="help" id="voiceSettings">
@@ -64,10 +69,9 @@
     <details class="help">
       <summary>📌 使用說明</summary>
       <ul>
-        <li><b>資料夾</b>：新增單字/句子前要先在「📚 單字本」分頁建立至少一個資料夾，沒有資料夾無法新增。</li>
+        <li><b>🔍 查詢</b>：打字輸入字/句按「查詢」，先看翻譯結果（中文欄位可以直接點下去修改），確認沒問題再按「➕ 加入單字本」才會真正存起來；存的時候要選資料夾，沒有資料夾無法存，請先到「📚 單字本」分頁建立一個。</li>
         <li><b>資料夾勾選</b>：點資料夾的方框或名稱＝勾選，決定單字本顯示哪些資料夾的內容（一個都沒勾就不顯示任何內容），循環播放也只會播勾選資料夾裡的內容。按 ✏️ 改資料夾名稱、🗑️ 刪除整個資料夾（連同裡面的內容）。</li>
-        <li><b>句子翻譯需要連線</b>：新增句子後會自動上網翻譯中文（單字則用內建離線對照表）。</li>
-        <li><b>點擊中文註解可修改</b>：點任一筆的中文，即可手動修改翻譯內容。</li>
+        <li><b>句子翻譯需要連線</b>：查詢句子會自動上網翻譯中文（單字則用內建離線對照表）。</li>
         <li>單字會自動標音標；按 🔊 只念英文，循環播放會先念英文再念中文。</li>
         <li><b>🔊 語音設定</b>：可分別選英文、中文要用哪個語音念，按「▶️ 試聽」先聽聽看；選擇會記住。</li>
         <li><b>語速</b>：拖曳滑桿調整念的速度（0.5×～1.5×），會記住上次設定。</li>
@@ -75,8 +79,6 @@
         <li>勾選左側方塊可多選，按「🗑️ 刪除選取」只會刪除目前清單裡勾選的那幾筆，不會動到資料夾本身。</li>
         <li><b>📤 匯出 / 📥 匯入</b>：匯出會把目前的資料夾跟內容打包成備份檔，可以傳給其他用這個 App 的人；匯入時會合併進你自己的資料夾（同名合併、不同名新建），同一筆單字/句子已存在就更新翻譯和音標，但不會動到你自己的複習進度。</li>
         <li><b>🃏 單字卡</b>：在單字本勾選想要的單字/句子，按「🃏 單字卡」會排成適合列印的小卡版面，可直接列印或存成 PDF。</li>
-        <li><b>🔍 快速查詢</b>：打字輸入字/句立刻看翻譯，跟「新增」分開、單純查詢用，查完可以選資料夾再按「加入單字本」存起來。</li>
-        <li><b>📷 鏡頭翻譯</b>：拍一張英文文字的照片，App 用本機文字辨識自動讀出文字並翻譯，可以選資料夾加入單字本。第一次使用需要網路下載辨識引擎；免費辨識遇到模糊照片或複雜背景容易認錯字。</li>
         <li><b>📅 複習分頁</b>：用「間隔重複法」幫你記單字。每天只丟出<b>到期該複習</b>的單字，一次一張卡，先回想再按「👀 看中文意思」。</li>
         <li>複習時按 <b>✅ 記得</b> 會把下次間隔拉長（1天→2天→4天→7天→14天）；按 <b>❌ 忘了</b> 則歸零、10 分鐘後再出現。記熟的字會慢慢淡出，模糊的字一直回來找你。</li>
         <li>分頁鈕上的數字：「📅 複習」顯示今天到期幾個、「📚 單字本」顯示總筆數。</li>
@@ -88,14 +90,14 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.4.5</li>
+        <li><b class="dev-k">版本</b>：v1.5.0</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
    </div>
 
    <div class="tab-page" id="tab-review">
-    <p id="reviewEmpty" class="empty">今天沒有要複習的單字 🎉<br>去「新增」加幾個，或晚點再回來。</p>
+    <p id="reviewEmpty" class="empty">今天沒有要複習的單字 🎉<br>去「查詢」加幾個，或晚點再回來。</p>
     <div id="reviewCard" class="review-card hidden">
       <div id="rcText" class="rc-text"></div>
       <div id="rcPhonetic" class="rc-phonetic"></div>
@@ -142,23 +144,6 @@
 
     <ul id="list" class="list"></ul>
     <p id="empty" class="empty">還沒有任何內容，從上面新增第一筆吧！</p>
-   </div>
-
-   <div class="tab-page" id="tab-lookup">
-    <section class="add-box tool-box">
-      <textarea id="lookupInput" rows="2" placeholder="輸入英文單字或句子，立刻看翻譯"></textarea>
-      <button id="lookupGoBtn" class="btn-primary tool-btn">🔍 查詢翻譯</button>
-
-      <div id="lookupResult" class="lookup-result hidden">
-        <div id="lookupResultEn" class="lookup-en"></div>
-        <div id="lookupResultPh" class="lookup-ph"></div>
-        <div id="lookupResultZh" class="lookup-zh"></div>
-      </div>
-
-      <p id="lookupNoFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能加入單字本。</p>
-      <select id="lookupFolderSelect" class="folder-select hidden"></select>
-      <button id="lookupAddBtn" class="btn-loop tool-btn hidden">＋ 加入單字本</button>
-    </section>
    </div>
 
    <div class="tab-page" id="tab-camera">

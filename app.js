@@ -29,16 +29,11 @@ const $importFile = document.getElementById("importFile");
 const $flashcardBtn = document.getElementById("flashcardBtn");
 const $printSheet = document.getElementById("printSheet");
 const $cameraBtn = document.getElementById("cameraBtn");
-const $lookupBtn = document.getElementById("lookupBtn");
-const $lookupInput = document.getElementById("lookupInput");
-const $lookupGoBtn = document.getElementById("lookupGoBtn");
+const $addToBookBtn = document.getElementById("addToBookBtn");
 const $lookupResult = document.getElementById("lookupResult");
 const $lookupResultEn = document.getElementById("lookupResultEn");
 const $lookupResultPh = document.getElementById("lookupResultPh");
 const $lookupResultZh = document.getElementById("lookupResultZh");
-const $lookupFolderSelect = document.getElementById("lookupFolderSelect");
-const $lookupNoFolderNotice = document.getElementById("lookupNoFolderNotice");
-const $lookupAddBtn = document.getElementById("lookupAddBtn");
 const $cameraInput = document.getElementById("cameraInput");
 const $cameraCaptureBtn = document.getElementById("cameraCaptureBtn");
 const $cameraPreview = document.getElementById("cameraPreview");
@@ -105,7 +100,7 @@ let folders = loadFolders();
 let items = loadItems();
 const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放只播勾選的」用
 const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
-let lookupCurrent = null; // 快速查詢目前查到的結果 { text, zh, phonetic, sentence }
+let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
 let cameraCurrent = null; // 鏡頭翻譯目前辨識出來的結果 { text, zh }
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
@@ -223,66 +218,6 @@ async function backfillPhonetics() {
     }
   } finally {
     backfilling = false;
-  }
-}
-
-// ---- 新增 ----
-async function addItem() {
-  if (!folders.length) {
-    alert("目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能新增單字或句子。");
-    return;
-  }
-  const text = $input.value.trim();
-  if (!text) return;
-  const sentence = isSentence(text);
-  const phonetic = sentence ? null : lookupPhonetic(text);
-
-  // 中文：離線表 > 線上翻譯（自動帶入，之後可在單字本點中文修改）
-  let zh = lookupZh(text) || "";
-
-  const folderId = folders.some((f) => f.id === $folderSelect.value)
-    ? $folderSelect.value
-    : folders[0].id;
-  localStorage.setItem("last_folder_id", folderId);
-  checkedFolderIds.add(folderId); // 加進哪個資料夾就直接打勾，單字本馬上看得到
-
-  const item = {
-    id: genId(),
-    text,
-    zh,
-    sentence,
-    phonetic,
-    folderId,
-    box: 0,
-    due: Date.now(),
-  };
-  items.unshift(item);
-  saveItems();
-  $input.value = "";
-  $input.focus();
-  render();
-
-  // 若還沒有中文（句子或冷僻字），背景上網翻譯，翻到了再補上
-  if (!zh) {
-    markTranslating(item.id, true);
-    const online = await translateOnline(text);
-    if (online && items.some((it) => it.id === item.id)) {
-      item.zh = online;
-      saveItems();
-    }
-    markTranslating(item.id, false);
-    render();
-  }
-
-  // 若是單字但離線表查不到音標，背景上網查，查到再補上
-  if (!sentence && !item.phonetic && !item.phoneticTried) {
-    const ph = await fetchPhoneticOnline(text);
-    if (items.some((it) => it.id === item.id)) {
-      if (ph) item.phonetic = ph;
-      item.phoneticTried = true;
-      saveItems();
-      render();
-    }
   }
 }
 
@@ -422,27 +357,16 @@ function fillFolderOptions($select) {
   if (folders.some((f) => f.id === lastId)) $select.value = lastId;
 }
 
-// 「新增」分頁的資料夾選單：沒有資料夾時鎖住輸入並顯示原因
+// 「查詢」分頁的資料夾選單與「加入單字本」鈕狀態（沒有資料夾時不能存，但查詢本身不受影響）
 function renderAddFolderSelect() {
   const hasFolders = folders.length > 0;
   $noFolderNotice.classList.toggle("hidden", hasFolders);
   $folderSelect.classList.toggle("hidden", !hasFolders);
-  $input.disabled = !hasFolders;
-  $addBtn.disabled = !hasFolders;
+  $addToBookBtn.classList.toggle("hidden", !lookupCurrent);
+  $addToBookBtn.disabled = !hasFolders || !lookupCurrent;
   if (hasFolders) fillFolderOptions($folderSelect);
 
-  renderLookupFolderUI();
   renderCameraFolderUI();
-}
-
-// 「快速查詢」分頁的資料夾選單與「加入單字本」鈕狀態
-function renderLookupFolderUI() {
-  const hasFolders = folders.length > 0;
-  $lookupNoFolderNotice.classList.toggle("hidden", hasFolders);
-  $lookupFolderSelect.classList.toggle("hidden", !hasFolders);
-  $lookupAddBtn.classList.toggle("hidden", !lookupCurrent);
-  $lookupAddBtn.disabled = !hasFolders || !lookupCurrent;
-  if (hasFolders) fillFolderOptions($lookupFolderSelect);
 }
 
 // 「鏡頭翻譯」分頁的資料夾選單與「加入單字本」鈕狀態
@@ -464,13 +388,6 @@ function editZh(id) {
   it.zh = v.trim();
   saveItems();
   render();
-}
-
-// 顯示某筆「翻譯中…」狀態
-const translatingIds = new Set();
-function markTranslating(id, on) {
-  if (on) translatingIds.add(id);
-  else translatingIds.delete(id);
 }
 
 // ---- 刪除 ----
@@ -772,11 +689,6 @@ function render() {
       zh.title = "點一下可修改中文";
       zh.onclick = () => editZh(it.id);
       main.appendChild(zh);
-    } else if (translatingIds.has(it.id)) {
-      const zh = document.createElement("div");
-      zh.className = "item-zh";
-      zh.textContent = "🌐 翻譯中…";
-      main.appendChild(zh);
     }
 
     const actions = document.createElement("div");
@@ -820,13 +732,6 @@ function render() {
 }
 
 // ---- 事件 ----
-$addBtn.addEventListener("click", addItem);
-$input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    addItem();
-  }
-});
 $search.addEventListener("input", render);
 
 // 語速滑桿：即時套用到單筆播放與循環播放
@@ -1024,7 +929,7 @@ $importFile.addEventListener("change", () => {
 });
 $flashcardBtn.addEventListener("click", exportFlashcards);
 
-// ---- 快速查詢：打字輸入，立刻看翻譯，可選擇加入單字本 ----
+// ---- 查詢：打字輸入，立刻看翻譯（中文可編輯），確認後才加入單字本 ----
 function renderLookupResult() {
   if (!lookupCurrent) {
     $lookupResult.classList.add("hidden");
@@ -1041,7 +946,7 @@ function renderLookupResult() {
 }
 
 async function runLookup() {
-  const text = $lookupInput.value.trim();
+  const text = $input.value.trim();
   if (!text) return;
   const sentence = isSentence(text);
   const phonetic = sentence ? null : lookupPhonetic(text);
@@ -1049,7 +954,7 @@ async function runLookup() {
 
   lookupCurrent = { text, zh, phonetic, sentence };
   renderLookupResult();
-  renderLookupFolderUI();
+  renderAddFolderSelect();
 
   if (!zh) {
     const online = await translateOnline(text);
@@ -1067,10 +972,18 @@ async function runLookup() {
   }
 }
 
-function addLookupToBook() {
+function editLookupZh() {
+  if (!lookupCurrent) return;
+  const v = prompt("修改中文意思：", lookupCurrent.zh || "");
+  if (v === null) return;
+  lookupCurrent.zh = v.trim();
+  renderLookupResult();
+}
+
+function addToBook() {
   if (!lookupCurrent || !folders.length) return;
-  const folderId = folders.some((f) => f.id === $lookupFolderSelect.value)
-    ? $lookupFolderSelect.value
+  const folderId = folders.some((f) => f.id === $folderSelect.value)
+    ? $folderSelect.value
     : folders[0].id;
   localStorage.setItem("last_folder_id", folderId);
   checkedFolderIds.add(folderId);
@@ -1085,25 +998,32 @@ function addLookupToBook() {
     due: Date.now(),
   });
   saveItems();
-  render();
   alert("已加入單字本！");
+
+  $input.value = "";
+  lookupCurrent = null;
+  renderLookupResult();
+  renderAddFolderSelect();
+  render();
 }
 
-$lookupGoBtn.addEventListener("click", runLookup);
-$lookupInput.addEventListener("keydown", (e) => {
+$lookupResultZh.title = "點一下可修改中文";
+$lookupResultZh.addEventListener("click", editLookupZh);
+$addBtn.addEventListener("click", runLookup);
+$input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     runLookup();
   }
 });
-$lookupInput.addEventListener("input", () => {
-  if (!$lookupInput.value.trim()) {
+$input.addEventListener("input", () => {
+  if (!$input.value.trim()) {
     lookupCurrent = null;
     renderLookupResult();
-    renderLookupFolderUI();
+    renderAddFolderSelect();
   }
 });
-$lookupAddBtn.addEventListener("click", addLookupToBook);
+$addToBookBtn.addEventListener("click", addToBook);
 
 // ---- 鏡頭翻譯：拍照→本機 OCR 辨識→翻譯，可選擇加入單字本 ----
 function renderCameraResult() {
@@ -1186,9 +1106,8 @@ $cameraInput.addEventListener("change", async () => {
 });
 $cameraAddBtn.addEventListener("click", addCameraToBook);
 
-// 鏡頭翻譯／快速查詢 分頁切換事件
+// 鏡頭翻譯 分頁切換事件
 $cameraBtn.addEventListener("click", () => switchTab("camera"));
-$lookupBtn.addEventListener("click", () => switchTab("lookup"));
 
 // 循環播放開關
 $loopBtn.addEventListener("click", () => {

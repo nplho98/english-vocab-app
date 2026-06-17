@@ -63,6 +63,7 @@ body {
   background: #eff6ff; color: var(--blue);
   border-radius: 10px; padding: 8px 6px; font-size: 0.85rem; font-weight: 600; font-family: inherit;
 }
+.sub-btn:disabled { background: var(--bg); color: var(--muted); cursor: not-allowed; }
 .hidden { display: none; }
 
 .add-box {
@@ -91,6 +92,8 @@ body {
 .lookup-en { font-size: 1.4rem; font-weight: 700; word-break: break-word; }
 .lookup-ph { color: var(--blue); font-family: "Times New Roman", serif; font-size: 1rem; }
 .lookup-zh { font-size: 1.1rem; color: var(--text); }
+.lookup-zh.editable { cursor: pointer; }
+.lookup-zh.editable:active { opacity: 0.6; }
 
 .btn-primary {
   background: var(--blue); color: #fff; border: none; border-radius: 12px;

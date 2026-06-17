@@ -201,6 +201,13 @@ body {
 }
 .item-check { width: 26px; height: 26px; accent-color: var(--blue); flex-shrink: 0; }
 .item.selected { background: #eff6ff; border-color: #bfdbfe; }
+.item-move { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.move-btn {
+  width: 28px; height: 28px; border: none; border-radius: 8px;
+  background: var(--bg); color: var(--muted); font-size: 0.8rem; cursor: pointer;
+  display: grid; place-items: center; padding: 0;
+}
+.move-btn:disabled { opacity: 0.3; cursor: default; }
 
 .item {
   background: var(--card); border: 1px solid var(--border); border-radius: 14px;

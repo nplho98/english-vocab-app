@@ -396,6 +396,21 @@ function deleteItem(id) {
   render();
 }
 
+// ---- 上下移動排序（在目前畫面看到的清單範圍內移動，順序存進 items 本身）----
+function moveItem(id, dir) {
+  const shown = currentShownItems();
+  const idx = shown.findIndex((it) => it.id === id);
+  if (idx === -1) return;
+  const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= shown.length) return;
+  const a = shown[idx], b = shown[swapIdx];
+  const ai = items.indexOf(a), bi = items.indexOf(b);
+  items[ai] = b;
+  items[bi] = a;
+  saveItems();
+  render();
+}
+
 // ---- 挑選最自然的英文語音 ----
 let bestVoice = null;
 function pickBestVoice() {
@@ -607,7 +622,7 @@ function render() {
   const shown = currentShownItems();
 
   $list.innerHTML = "";
-  shown.forEach((it) => {
+  shown.forEach((it, idx) => {
     const li = document.createElement("li");
     li.className = "item" + (selectedIds.has(it.id) ? " selected" : "");
     li.dataset.id = it.id;
@@ -623,6 +638,23 @@ function render() {
       updateBulkBar();
     };
     li.appendChild(check);
+
+    const moveBox = document.createElement("div");
+    moveBox.className = "item-move";
+    const upBtn = document.createElement("button");
+    upBtn.className = "move-btn";
+    upBtn.textContent = "▲";
+    upBtn.title = "往上移";
+    upBtn.disabled = idx === 0;
+    upBtn.onclick = () => moveItem(it.id, "up");
+    const downBtn = document.createElement("button");
+    downBtn.className = "move-btn";
+    downBtn.textContent = "▼";
+    downBtn.title = "往下移";
+    downBtn.disabled = idx === shown.length - 1;
+    downBtn.onclick = () => moveItem(it.id, "down");
+    moveBox.append(upBtn, downBtn);
+    li.appendChild(moveBox);
 
     const main = document.createElement("div");
     main.className = "item-main";

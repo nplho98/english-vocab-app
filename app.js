@@ -1,5 +1,6 @@
 // ===== 我的英文背單字本 — 主程式 =====
 const STORAGE_KEY = "my_vocab_items_v1";
+const FOLDERS_KEY = "my_vocab_folders_v1";
 
 const $input = document.getElementById("input");
 const $addBtn = document.getElementById("addBtn");
@@ -18,9 +19,45 @@ const $bulkBar = document.getElementById("bulkBar");
 const $selectAll = document.getElementById("selectAll");
 const $selCount = document.getElementById("selCount");
 const $delSelBtn = document.getElementById("delSelBtn");
+const $folderSelect = document.getElementById("folderSelect");
+const $noFolderNotice = document.getElementById("noFolderNotice");
+const $folderList = document.getElementById("folderList");
+const $addFolderBtn = document.getElementById("addFolderBtn");
 
+function genId() {
+  return Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+}
+
+// ---- 資料夾 ----
+function loadFolders() {
+  try {
+    return JSON.parse(localStorage.getItem(FOLDERS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+function saveFolders() {
+  localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+}
+
+let folders = loadFolders();
 let items = loadItems();
+let currentFolderId = null; // null = 全部
 const selectedIds = new Set();
+
+// 舊資料沒有資料夾欄位：自動建一個「未分類」收進去，新安裝（沒資料也沒資料夾）則維持空白讓使用者自己建
+(function migrateLegacyItems() {
+  const orphans = items.filter((it) => !it.folderId);
+  if (!orphans.length) return;
+  let target = folders.find((f) => f.name === "未分類");
+  if (!target) {
+    target = { id: genId(), name: "未分類" };
+    folders.unshift(target);
+    saveFolders();
+  }
+  orphans.forEach((it) => (it.folderId = target.id));
+  saveItems();
+})();
 // 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
 function loadSpeechRate() {
   const r = parseFloat(localStorage.getItem("speech_rate"));
@@ -140,6 +177,10 @@ async function backfillPhonetics() {
 
 // ---- 新增 ----
 async function addItem() {
+  if (!folders.length) {
+    alert("目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能新增單字或句子。");
+    return;
+  }
   const text = $input.value.trim();
   if (!text) return;
   const sentence = isSentence(text);
@@ -148,12 +189,18 @@ async function addItem() {
   // 中文：離線表 > 線上翻譯（自動帶入，之後可在單字本點中文修改）
   let zh = lookupZh(text) || "";
 
+  const folderId = folders.some((f) => f.id === $folderSelect.value)
+    ? $folderSelect.value
+    : folders[0].id;
+  localStorage.setItem("last_folder_id", folderId);
+
   const item = {
-    id: Date.now() + "-" + Math.random().toString(36).slice(2, 6),
+    id: genId(),
     text,
     zh,
     sentence,
     phonetic,
+    folderId,
     box: 0,
     due: Date.now(),
   };
@@ -216,6 +263,125 @@ function deleteSelected() {
   selectedIds.clear();
   saveItems();
   render();
+}
+
+// ---- 資料夾管理：新增/重新命名/刪除 ----
+function addFolder() {
+  const name = prompt("新資料夾名稱：");
+  if (!name || !name.trim()) return;
+  folders.push({ id: genId(), name: name.trim() });
+  saveFolders();
+  renderFolders();
+  renderAddFolderSelect();
+}
+function renameFolder(id) {
+  const f = folders.find((x) => x.id === id);
+  if (!f) return;
+  const name = prompt("修改資料夾名稱：", f.name);
+  if (name === null || !name.trim()) return;
+  f.name = name.trim();
+  saveFolders();
+  renderFolders();
+  renderAddFolderSelect();
+}
+function deleteFolder(id) {
+  const f = folders.find((x) => x.id === id);
+  if (!f) return;
+  const n = items.filter((it) => it.folderId === id).length;
+  const msg =
+    n > 0
+      ? "刪除資料夾「" + f.name + "」會連同裡面 " + n + " 筆單字/句子一起刪除，確定嗎？"
+      : "確定刪除資料夾「" + f.name + "」？";
+  if (!confirm(msg)) return;
+  items.filter((it) => it.folderId === id).forEach((it) => selectedIds.delete(it.id));
+  items = items.filter((it) => it.folderId !== id);
+  folders = folders.filter((x) => x.id !== id);
+  if (currentFolderId === id) currentFolderId = null;
+  saveFolders();
+  saveItems();
+  renderAddFolderSelect();
+  render();
+}
+
+// 勾選資料夾 = 圈選資料夾內所有單字與句子（沿用既有的多選機制）
+function toggleFolderSelect(id, checked) {
+  items.filter((it) => it.folderId === id).forEach((it) => {
+    if (checked) selectedIds.add(it.id);
+    else selectedIds.delete(it.id);
+  });
+  render();
+}
+
+function renderFolders() {
+  if (!$folderList) return;
+  $folderList.innerHTML = "";
+
+  const allChip = document.createElement("button");
+  allChip.type = "button";
+  allChip.className = "folder-chip all" + (currentFolderId === null ? " active" : "");
+  allChip.textContent = "📂 全部 (" + items.length + ")";
+  allChip.onclick = () => {
+    currentFolderId = null;
+    render();
+  };
+  $folderList.appendChild(allChip);
+
+  folders.forEach((f) => {
+    const ids = items.filter((it) => it.folderId === f.id).map((it) => it.id);
+    const chip = document.createElement("div");
+    chip.className = "folder-chip" + (currentFolderId === f.id ? " active" : "");
+
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "folder-check";
+    check.checked = ids.length > 0 && ids.every((i) => selectedIds.has(i));
+    check.onclick = (e) => e.stopPropagation();
+    check.onchange = () => toggleFolderSelect(f.id, check.checked);
+    chip.appendChild(check);
+
+    const name = document.createElement("span");
+    name.className = "folder-name";
+    name.textContent = f.name + " (" + ids.length + ")";
+    name.onclick = () => {
+      currentFolderId = f.id;
+      render();
+    };
+    chip.appendChild(name);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "folder-edit";
+    editBtn.textContent = "✏️";
+    editBtn.onclick = (e) => { e.stopPropagation(); renameFolder(f.id); };
+    chip.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "folder-del";
+    delBtn.textContent = "🗑️";
+    delBtn.onclick = (e) => { e.stopPropagation(); deleteFolder(f.id); };
+    chip.appendChild(delBtn);
+
+    $folderList.appendChild(chip);
+  });
+}
+
+// 「新增」分頁的資料夾選單：沒有資料夾時鎖住輸入並顯示原因
+function renderAddFolderSelect() {
+  const hasFolders = folders.length > 0;
+  $noFolderNotice.classList.toggle("hidden", hasFolders);
+  $folderSelect.classList.toggle("hidden", !hasFolders);
+  $input.disabled = !hasFolders;
+  $addBtn.disabled = !hasFolders;
+  if (!hasFolders) return;
+
+  const lastId = localStorage.getItem("last_folder_id");
+  $folderSelect.innerHTML = "";
+  folders.forEach((f) => {
+    const opt = document.createElement("option");
+    opt.value = f.id;
+    opt.textContent = f.name;
+    $folderSelect.appendChild(opt);
+  });
+  if (folders.some((f) => f.id === lastId)) $folderSelect.value = lastId;
 }
 
 // 點中文可修改
@@ -424,7 +590,9 @@ function stopLoop() {
 function currentShownItems() {
   const keyword = $search.value.trim().toLowerCase();
   return items.filter(
-    (it) => it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword)
+    (it) =>
+      (currentFolderId === null || it.folderId === currentFolderId) &&
+      (it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword))
   );
 }
 
@@ -448,10 +616,7 @@ function clearHighlight() {
 
 // ---- 渲染清單 ----
 function render() {
-  const keyword = $search.value.trim().toLowerCase();
-  const shown = items.filter(
-    (it) => it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword)
-  );
+  const shown = currentShownItems();
 
   $list.innerHTML = "";
   shown.forEach((it) => {
@@ -528,15 +693,17 @@ function render() {
     $list.appendChild(li);
   });
 
-  $count.textContent = "共 " + items.length + " 筆";
+  $count.textContent = "共 " + shown.length + " 筆";
   const $tabCount = document.getElementById("tabCount");
   if ($tabCount) $tabCount.textContent = items.length;
   updateDueBadge();
   updateBulkBar();
-  $empty.classList.toggle("hidden", items.length > 0);
-  if (items.length > 0 && shown.length === 0) {
+  renderFolders();
+  $empty.classList.toggle("hidden", shown.length > 0);
+  if ($search.value.trim()) {
     $empty.textContent = "找不到符合「" + $search.value + "」的內容";
-    $empty.classList.remove("hidden");
+  } else if (currentFolderId !== null) {
+    $empty.textContent = "這個資料夾還沒有任何單字或句子";
   } else {
     $empty.textContent = "還沒有任何內容，從上面新增第一筆吧！";
   }
@@ -580,6 +747,11 @@ $testVoiceBtn.addEventListener("click", async () => {
 // 多選刪除事件
 $selectAll.addEventListener("change", toggleSelectAll);
 $delSelBtn.addEventListener("click", deleteSelected);
+
+// 資料夾事件
+$addFolderBtn.addEventListener("click", addFolder);
+renderAddFolderSelect();
+renderFolders();
 
 // 循環播放開關
 $loopBtn.addEventListener("click", () => {

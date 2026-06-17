@@ -24,8 +24,10 @@
 
   <main class="container">
    <div class="tab-page active" id="tab-add">
+    <p id="noFolderNotice" class="notice hidden">⚠️ 目前還沒有任何資料夾，請先到「📚 單字本」分頁建立一個資料夾，才能新增單字或句子。</p>
     <section class="add-box">
       <div class="add-fields">
+        <select id="folderSelect" class="folder-select hidden"></select>
         <textarea id="input" rows="2" placeholder="輸入英文單字或句子，例如：apple 或 How are you?"></textarea>
       </div>
       <button id="addBtn" class="btn-primary">＋ 新增</button>
@@ -79,7 +81,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.2.2</li>
+        <li><b class="dev-k">版本</b>：v1.2.3</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </section>
@@ -102,6 +104,11 @@
    </div>
 
    <div class="tab-page" id="tab-book">
+    <section class="folder-bar">
+      <div id="folderList" class="folder-list"></div>
+      <button id="addFolderBtn" class="btn-loop folder-add">📁＋ 新增資料夾</button>
+    </section>
+
     <section class="toolbar">
       <input id="search" type="search" placeholder="🔍 搜尋已加入的內容…" />
       <span id="count" class="count">共 0 筆</span>

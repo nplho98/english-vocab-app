@@ -289,18 +289,37 @@ function deleteFolder(id) {
   render();
 }
 
+// 勾選資料夾 = 圈選資料夾內所有單字與句子（沿用既有的多選機制；循環播放選「只播勾選的」時就是依這個範圍播）
+function toggleFolderSelect(id, checked) {
+  items.filter((it) => it.folderId === id).forEach((it) => {
+    if (checked) selectedIds.add(it.id);
+    else selectedIds.delete(it.id);
+  });
+  render();
+}
+
 function renderFolders() {
   if (!$folderList) return;
   $folderList.innerHTML = "";
+  const $folderSummaryCount = document.getElementById("folderSummaryCount");
+  if ($folderSummaryCount) $folderSummaryCount.textContent = folders.length;
 
   folders.forEach((f) => {
-    const count = items.filter((it) => it.folderId === f.id).length;
+    const ids = items.filter((it) => it.folderId === f.id).map((it) => it.id);
     const chip = document.createElement("div");
     chip.className = "folder-chip";
 
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.className = "folder-check";
+    check.checked = ids.length > 0 && ids.every((i) => selectedIds.has(i));
+    check.title = "勾選＝循環播放「只播勾選的」時會播這個資料夾";
+    check.onchange = () => toggleFolderSelect(f.id, check.checked);
+    chip.appendChild(check);
+
     const name = document.createElement("span");
     name.className = "folder-name";
-    name.textContent = f.name + " (" + count + ")";
+    name.textContent = f.name + " (" + ids.length + ")";
     name.title = "點一下可修改資料夾名稱";
     name.onclick = () => renameFolder(f.id);
     chip.appendChild(name);

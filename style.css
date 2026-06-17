@@ -126,11 +126,8 @@ body {
   background: var(--card); border: 1px solid var(--border); border-radius: 20px;
   padding: 6px 10px; font-size: 0.88rem;
 }
-.folder-chip.active { background: #eff6ff; border-color: var(--blue); color: var(--blue); }
-.folder-chip.all { border: none; cursor: pointer; font-weight: 600; }
-.folder-check { width: 20px; height: 20px; accent-color: var(--blue); margin: 0; }
 .folder-name { cursor: pointer; }
-.folder-edit, .folder-del {
+.folder-del {
   border: none; background: transparent; cursor: pointer; font-size: 0.9rem;
   padding: 2px; line-height: 1;
 }

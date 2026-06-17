@@ -42,22 +42,9 @@ function saveFolders() {
 
 let folders = loadFolders();
 let items = loadItems();
-let currentFolderId = null; // null = 全部
 const selectedIds = new Set();
 
-// 舊資料沒有資料夾欄位：自動建一個「未分類」收進去，新安裝（沒資料也沒資料夾）則維持空白讓使用者自己建
-(function migrateLegacyItems() {
-  const orphans = items.filter((it) => !it.folderId);
-  if (!orphans.length) return;
-  let target = folders.find((f) => f.name === "未分類");
-  if (!target) {
-    target = { id: genId(), name: "未分類" };
-    folders.unshift(target);
-    saveFolders();
-  }
-  orphans.forEach((it) => (it.folderId = target.id));
-  saveItems();
-})();
+// 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
 // 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
 function loadSpeechRate() {
   const r = parseFloat(localStorage.getItem("speech_rate"));
@@ -296,19 +283,9 @@ function deleteFolder(id) {
   items.filter((it) => it.folderId === id).forEach((it) => selectedIds.delete(it.id));
   items = items.filter((it) => it.folderId !== id);
   folders = folders.filter((x) => x.id !== id);
-  if (currentFolderId === id) currentFolderId = null;
   saveFolders();
   saveItems();
   renderAddFolderSelect();
-  render();
-}
-
-// 勾選資料夾 = 圈選資料夾內所有單字與句子（沿用既有的多選機制）
-function toggleFolderSelect(id, checked) {
-  items.filter((it) => it.folderId === id).forEach((it) => {
-    if (checked) selectedIds.add(it.id);
-    else selectedIds.delete(it.id);
-  });
   render();
 }
 
@@ -316,43 +293,17 @@ function renderFolders() {
   if (!$folderList) return;
   $folderList.innerHTML = "";
 
-  const allChip = document.createElement("button");
-  allChip.type = "button";
-  allChip.className = "folder-chip all" + (currentFolderId === null ? " active" : "");
-  allChip.textContent = "📂 全部 (" + items.length + ")";
-  allChip.onclick = () => {
-    currentFolderId = null;
-    render();
-  };
-  $folderList.appendChild(allChip);
-
   folders.forEach((f) => {
-    const ids = items.filter((it) => it.folderId === f.id).map((it) => it.id);
+    const count = items.filter((it) => it.folderId === f.id).length;
     const chip = document.createElement("div");
-    chip.className = "folder-chip" + (currentFolderId === f.id ? " active" : "");
-
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    check.className = "folder-check";
-    check.checked = ids.length > 0 && ids.every((i) => selectedIds.has(i));
-    check.onclick = (e) => e.stopPropagation();
-    check.onchange = () => toggleFolderSelect(f.id, check.checked);
-    chip.appendChild(check);
+    chip.className = "folder-chip";
 
     const name = document.createElement("span");
     name.className = "folder-name";
-    name.textContent = f.name + " (" + ids.length + ")";
-    name.onclick = () => {
-      currentFolderId = f.id;
-      render();
-    };
+    name.textContent = f.name + " (" + count + ")";
+    name.title = "點一下可修改資料夾名稱";
+    name.onclick = () => renameFolder(f.id);
     chip.appendChild(name);
-
-    const editBtn = document.createElement("button");
-    editBtn.className = "folder-edit";
-    editBtn.textContent = "✏️";
-    editBtn.onclick = (e) => { e.stopPropagation(); renameFolder(f.id); };
-    chip.appendChild(editBtn);
 
     const delBtn = document.createElement("button");
     delBtn.className = "folder-del";
@@ -590,9 +541,7 @@ function stopLoop() {
 function currentShownItems() {
   const keyword = $search.value.trim().toLowerCase();
   return items.filter(
-    (it) =>
-      (currentFolderId === null || it.folderId === currentFolderId) &&
-      (it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword))
+    (it) => it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword)
   );
 }
 
@@ -702,8 +651,6 @@ function render() {
   $empty.classList.toggle("hidden", shown.length > 0);
   if ($search.value.trim()) {
     $empty.textContent = "找不到符合「" + $search.value + "」的內容";
-  } else if (currentFolderId !== null) {
-    $empty.textContent = "這個資料夾還沒有任何單字或句子";
   } else {
     $empty.textContent = "還沒有任何內容，從上面新增第一筆吧！";
   }

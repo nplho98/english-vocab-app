@@ -620,7 +620,7 @@ function render() {
     if (it.zh) {
       const zh = document.createElement("div");
       zh.className = "item-zh editable";
-      zh.textContent = "🇹🇼 " + it.zh;
+      zh.textContent = it.zh;
       zh.title = "點一下可修改中文";
       zh.onclick = () => editZh(it.id);
       main.appendChild(zh);
@@ -877,7 +877,7 @@ function renderLookupResult() {
     : lookupCurrent.phonetic
     ? "/ " + lookupCurrent.phonetic + " /"
     : "（字典查無音標）";
-  $lookupResultZh.textContent = lookupCurrent.zh ? "🇹🇼 " + lookupCurrent.zh : "🌐 翻譯中…";
+  $lookupResultZh.textContent = lookupCurrent.zh ? lookupCurrent.zh : "🌐 翻譯中…";
 }
 
 async function runLookup() {
@@ -1021,7 +1021,7 @@ function renderReview() {
     $rcPhonetic.textContent = it.phonetic ? "/ " + it.phonetic + " /" : "";
   }
   // 蓋住中文，等使用者先回想
-  $rcZh.textContent = it.zh ? "🇹🇼 " + it.zh : "（沒有中文）";
+  $rcZh.textContent = it.zh ? it.zh : "（沒有中文）";
   $rcZh.classList.add("hidden");
   $rcActions.classList.add("hidden");
   $rcReveal.classList.remove("hidden");

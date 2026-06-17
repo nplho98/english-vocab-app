@@ -97,7 +97,7 @@ function saveFolders() {
 
 let folders = loadFolders();
 let items = loadItems();
-const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「單字卡」用
+const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放」「單字卡」用
 const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
 let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
 let cameraCurrent = null; // 鏡頭翻譯目前辨識出來的結果 { text, zh }
@@ -532,13 +532,13 @@ function speak(text, el) {
 
 // ---- 一鍵循環播放（依目前清單順序，念完最後一筆回到第一筆）----
 function loopItems() {
-  return currentShownItems();
+  return currentShownItems().filter((it) => selectedIds.has(it.id));
 }
 
 function startLoop() {
   const shown = loopItems();
   if (!shown.length) {
-    alert("目前這個播放範圍沒有可播放的內容 😊");
+    alert("目前沒有勾選任何要播放的單字或句子 😊");
     return;
   }
   isLooping = true;

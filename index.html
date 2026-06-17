@@ -70,7 +70,7 @@
         <li><b>資料夾勾選</b>：點資料夾的方框或名稱＝勾選，決定單字本顯示哪些資料夾的內容（一個都沒勾就不顯示任何內容）。按 ✏️ 改資料夾名稱、🗑️ 刪除整個資料夾（連同裡面的內容）。</li>
         <li><b>句子翻譯需要連線</b>：查詢句子會自動上網翻譯中文（單字則用內建離線對照表）。</li>
         <li>單字會自動標音標；按 🔊 只念英文。</li>
-        <li><b>🔁 循環播放</b>：只播清單裡左側方塊有勾選的單字/句子（先念英文再念中文），記得先勾再按播放。</li>
+        <li><b>🔁 循環播放</b>：只播清單裡左側方塊有勾選的單字/句子（先念英文再念中文），記得先勾再按播放。播放時畫面會鎖定，避免放口袋誤按其他按鈕，按「解鎖並停止播放」才能恢復操作。</li>
         <li><b>🔊 語音設定</b>：可分別選英文、中文要用哪個語音念，按「▶️ 試聽」先聽聽看；選擇會記住。</li>
         <li><b>語速</b>：拖曳滑桿調整念的速度（0.5×～1.5×），會記住上次設定。</li>
         <li><b>排序</b>：清單每筆左側的 ▲▼ 可以上下移動排序，順序會記住。</li>
@@ -88,7 +88,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.6.1</li>
+        <li><b class="dev-k">版本</b>：v1.7.0</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
@@ -138,6 +138,13 @@
   </main>
 
   <div id="printSheet" class="print-sheet"></div>
+
+  <div id="lockOverlay" class="lock-overlay hidden">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-text">播放中，畫面已鎖定，避免誤按</div>
+    <div id="lockCurrentText" class="lock-current"></div>
+    <button id="unlockBtn" class="btn-primary lock-unlock">⏹️ 解鎖並停止播放</button>
+  </div>
 
   <script src="dict.js"></script>
   <script src="app.js"></script>

@@ -9,6 +9,9 @@ const $empty = document.getElementById("empty");
 const $count = document.getElementById("count");
 const $search = document.getElementById("search");
 const $loopBtn = document.getElementById("loopBtn");
+const $lockOverlay = document.getElementById("lockOverlay");
+const $lockCurrentText = document.getElementById("lockCurrentText");
+const $unlockBtn = document.getElementById("unlockBtn");
 const $speed = document.getElementById("speed");
 const $speedVal = document.getElementById("speedVal");
 const $enVoice = document.getElementById("enVoice");
@@ -52,7 +55,20 @@ function saveFolders() {
 let folders = loadFolders();
 let items = loadItems();
 const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放」「單字卡」用
-const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
+
+// 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）；存進 localStorage，關閉 App 不會忘記
+const CHECKED_FOLDERS_KEY = "my_vocab_checked_folders_v1";
+function loadCheckedFolderIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(CHECKED_FOLDERS_KEY)) || []);
+  } catch {
+    return new Set();
+  }
+}
+function saveCheckedFolderIds() {
+  localStorage.setItem(CHECKED_FOLDERS_KEY, JSON.stringify([...checkedFolderIds]));
+}
+const checkedFolderIds = loadCheckedFolderIds();
 let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
@@ -211,6 +227,7 @@ function addFolder() {
   const f = { id: genId(), name: name.trim() };
   folders.push(f);
   checkedFolderIds.add(f.id); // 新建的資料夾直接打勾，馬上看得到
+  saveCheckedFolderIds();
   saveFolders();
   render();
   renderAddFolderSelect();
@@ -238,6 +255,7 @@ function deleteFolder(id) {
   items = items.filter((it) => it.folderId !== id);
   folders = folders.filter((x) => x.id !== id);
   checkedFolderIds.delete(id);
+  saveCheckedFolderIds();
   saveFolders();
   saveItems();
   renderAddFolderSelect();
@@ -248,6 +266,7 @@ function deleteFolder(id) {
 function toggleFolderChecked(id, checked) {
   if (checked) checkedFolderIds.add(id);
   else checkedFolderIds.delete(id);
+  saveCheckedFolderIds();
   render();
 }
 
@@ -485,6 +504,7 @@ function startLoop() {
   isLooping = true;
   $loopBtn.classList.add("playing");
   $loopBtn.textContent = "⏹️ 停止播放";
+  $lockOverlay.classList.remove("hidden");
   let idx = 0;
 
   const playNext = async () => {
@@ -494,6 +514,7 @@ function startLoop() {
     if (idx >= list.length) idx = 0; // 循環回到開頭
     const it = list[idx];
     highlightRow(it.id);
+    $lockCurrentText.textContent = it.text;
 
     if (!bestVoice) pickBestVoice();
     // 先念英文
@@ -520,6 +541,7 @@ function stopLoop() {
   window.speechSynthesis.cancel();
   $loopBtn.classList.remove("playing");
   $loopBtn.textContent = "🔁 循環播放";
+  $lockOverlay.classList.add("hidden");
   clearHighlight();
 }
 
@@ -811,6 +833,7 @@ function importData(file) {
     });
     saveFolders();
     saveItems();
+    saveCheckedFolderIds();
     renderAddFolderSelect();
     render();
     alert(
@@ -922,6 +945,7 @@ function addToBook() {
     : folders[0].id;
   localStorage.setItem("last_folder_id", folderId);
   checkedFolderIds.add(folderId);
+  saveCheckedFolderIds();
   items.unshift({
     id: genId(),
     text: lookupCurrent.text,
@@ -965,6 +989,7 @@ $loopBtn.addEventListener("click", () => {
   if (isLooping) stopLoop();
   else startLoop();
 });
+$unlockBtn.addEventListener("click", stopLoop);
 
 // ---- 分頁切換 ----
 function switchTab(name) {

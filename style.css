@@ -54,6 +54,17 @@ body {
 .tab-page { display: none; }
 .tab-page.active { display: block; }
 
+.subbar {
+  display: flex; gap: 6px; padding: 0 8px 8px;
+  max-width: 640px; margin: 0 auto;
+}
+.sub-btn {
+  flex: 1; border: none; cursor: pointer;
+  background: #eff6ff; color: var(--blue);
+  border-radius: 10px; padding: 8px 6px; font-size: 0.85rem; font-weight: 600; font-family: inherit;
+}
+.hidden { display: none; }
+
 .add-box {
   display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px;
 }
@@ -243,3 +254,20 @@ body {
 .rc-actions button { flex: 1; padding: 16px; font-size: 1.05rem; }
 .rc-know { background: #dcfce7; color: #15803d; }
 #rcProgress { margin-top: 4px; }
+
+/* ---- 單字卡列印 ---- */
+.print-sheet { display: none; }
+@media print {
+  body > *:not(.print-sheet) { display: none !important; }
+  .print-sheet {
+    display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+  }
+  .pcard {
+    border: 1px dashed #999; border-radius: 8px; padding: 10px 6px;
+    text-align: center; display: flex; flex-direction: column; gap: 4px; justify-content: center;
+    min-height: 90px; break-inside: avoid;
+  }
+  .pcard-en { font-weight: 700; font-size: 0.95rem; }
+  .pcard-ph { color: #2563eb; font-size: 0.72rem; font-family: "Times New Roman", serif; }
+  .pcard-zh { font-size: 0.78rem; color: #64748b; }
+}

@@ -23,6 +23,11 @@ const $folderSelect = document.getElementById("folderSelect");
 const $noFolderNotice = document.getElementById("noFolderNotice");
 const $folderList = document.getElementById("folderList");
 const $addFolderBtn = document.getElementById("addFolderBtn");
+const $exportBtn = document.getElementById("exportBtn");
+const $importBtn = document.getElementById("importBtn");
+const $importFile = document.getElementById("importFile");
+const $flashcardBtn = document.getElementById("flashcardBtn");
+const $printSheet = document.getElementById("printSheet");
 
 function genId() {
   return Date.now() + "-" + Math.random().toString(36).slice(2, 6);
@@ -42,7 +47,8 @@ function saveFolders() {
 
 let folders = loadFolders();
 let items = loadItems();
-const selectedIds = new Set();
+const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放只播勾選的」用
+const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
 // 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
@@ -180,6 +186,7 @@ async function addItem() {
     ? $folderSelect.value
     : folders[0].id;
   localStorage.setItem("last_folder_id", folderId);
+  checkedFolderIds.add(folderId); // 加進哪個資料夾就直接打勾，單字本馬上看得到
 
   const item = {
     id: genId(),
@@ -256,9 +263,11 @@ function deleteSelected() {
 function addFolder() {
   const name = prompt("新資料夾名稱：");
   if (!name || !name.trim()) return;
-  folders.push({ id: genId(), name: name.trim() });
+  const f = { id: genId(), name: name.trim() };
+  folders.push(f);
+  checkedFolderIds.add(f.id); // 新建的資料夾直接打勾，馬上看得到
   saveFolders();
-  renderFolders();
+  render();
   renderAddFolderSelect();
 }
 function renameFolder(id) {
@@ -283,18 +292,17 @@ function deleteFolder(id) {
   items.filter((it) => it.folderId === id).forEach((it) => selectedIds.delete(it.id));
   items = items.filter((it) => it.folderId !== id);
   folders = folders.filter((x) => x.id !== id);
+  checkedFolderIds.delete(id);
   saveFolders();
   saveItems();
   renderAddFolderSelect();
   render();
 }
 
-// 勾選資料夾 = 圈選資料夾內所有單字與句子（沿用既有的多選機制；循環播放選「只播勾選的」時就是依這個範圍播）
-function toggleFolderSelect(id, checked) {
-  items.filter((it) => it.folderId === id).forEach((it) => {
-    if (checked) selectedIds.add(it.id);
-    else selectedIds.delete(it.id);
-  });
+// 勾選資料夾＝決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示任何單字/句子）
+function toggleFolderChecked(id, checked) {
+  if (checked) checkedFolderIds.add(id);
+  else checkedFolderIds.delete(id);
   render();
 }
 
@@ -305,21 +313,21 @@ function renderFolders() {
   if ($folderSummaryCount) $folderSummaryCount.textContent = folders.length;
 
   folders.forEach((f) => {
-    const ids = items.filter((it) => it.folderId === f.id).map((it) => it.id);
+    const count = items.filter((it) => it.folderId === f.id).length;
     const chip = document.createElement("div");
     chip.className = "folder-chip";
 
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "folder-check";
-    check.checked = ids.length > 0 && ids.every((i) => selectedIds.has(i));
-    check.title = "勾選＝循環播放「只播勾選的」時會播這個資料夾";
-    check.onchange = () => toggleFolderSelect(f.id, check.checked);
+    check.checked = checkedFolderIds.has(f.id);
+    check.title = "勾選＝單字本顯示這個資料夾的內容（沒勾任何資料夾就不會顯示）";
+    check.onchange = () => toggleFolderChecked(f.id, check.checked);
     chip.appendChild(check);
 
     const name = document.createElement("span");
     name.className = "folder-name";
-    name.textContent = f.name + " (" + ids.length + ")";
+    name.textContent = f.name + " (" + count + ")";
     name.title = "點一下可修改資料夾名稱";
     name.onclick = () => renameFolder(f.id);
     chip.appendChild(name);
@@ -558,9 +566,12 @@ function stopLoop() {
 }
 
 function currentShownItems() {
+  if (checkedFolderIds.size === 0) return [];
   const keyword = $search.value.trim().toLowerCase();
   return items.filter(
-    (it) => it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword)
+    (it) =>
+      checkedFolderIds.has(it.folderId) &&
+      (it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword))
   );
 }
 
@@ -668,10 +679,14 @@ function render() {
   updateBulkBar();
   renderFolders();
   $empty.classList.toggle("hidden", shown.length > 0);
-  if ($search.value.trim()) {
+  if (checkedFolderIds.size === 0) {
+    $empty.textContent = folders.length
+      ? "請先在上方「📁 資料夾」勾選想查看的資料夾"
+      : "還沒有任何內容，從上面新增第一筆吧！";
+  } else if ($search.value.trim()) {
     $empty.textContent = "找不到符合「" + $search.value + "」的內容";
   } else {
-    $empty.textContent = "還沒有任何內容，從上面新增第一筆吧！";
+    $empty.textContent = "這個資料夾還沒有任何單字或句子";
   }
 }
 
@@ -718,6 +733,167 @@ $delSelBtn.addEventListener("click", deleteSelected);
 $addFolderBtn.addEventListener("click", addFolder);
 renderAddFolderSelect();
 renderFolders();
+
+// ---- 匯出：依資料夾分類打包成 JSON 備份檔 ----
+function buildExportPayload() {
+  return {
+    app: "vocab-app-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    folders: folders.map((f) => ({
+      name: f.name,
+      items: items
+        .filter((it) => it.folderId === f.id)
+        .map((it) => ({
+          text: it.text,
+          zh: it.zh || "",
+          sentence: !!it.sentence,
+          phonetic: it.phonetic || null,
+        })),
+    })),
+  };
+}
+
+async function exportData() {
+  if (!folders.length) {
+    alert("目前沒有任何資料夾，沒有內容可以匯出。");
+    return;
+  }
+  const json = JSON.stringify(buildExportPayload(), null, 2);
+  const filename = "vocab-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: "JSON 備份檔", accept: { "application/json": [".json"] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      alert("已匯出備份檔！");
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // 使用者自己取消另存視窗
+      // 不支援或失敗就往下走，改用預設下載
+    }
+  }
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  alert("已匯出備份檔到「下載」資料夾：" + filename);
+}
+
+// ---- 匯入：合併進現有資料夾，不覆蓋使用者自建內容 ----
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch {
+      alert("這個檔案不是有效的備份檔，匯入失敗。");
+      return;
+    }
+    if (!data || !Array.isArray(data.folders)) {
+      alert("這個檔案格式不對，匯入失敗。");
+      return;
+    }
+    let addedFolders = 0, addedItems = 0, updatedItems = 0;
+    data.folders.forEach((block) => {
+      if (!block || typeof block.name !== "string" || !block.name.trim()) return;
+      const name = block.name.trim();
+      let target = folders.find((f) => f.name === name);
+      if (!target) {
+        target = { id: genId(), name };
+        folders.push(target);
+        addedFolders++;
+      }
+      checkedFolderIds.add(target.id);
+      (block.items || []).forEach((im) => {
+        if (!im || typeof im.text !== "string" || !im.text.trim()) return;
+        const text = im.text.trim();
+        const existing = items.find((it) => it.folderId === target.id && it.text === text);
+        if (existing) {
+          existing.zh = im.zh || existing.zh;
+          existing.phonetic = im.phonetic || existing.phonetic;
+          existing.sentence = !!im.sentence;
+          updatedItems++;
+        } else {
+          items.push({
+            id: genId(),
+            text,
+            zh: im.zh || "",
+            sentence: !!im.sentence,
+            phonetic: im.phonetic || null,
+            folderId: target.id,
+            box: 0,
+            due: Date.now(),
+          });
+          addedItems++;
+        }
+      });
+    });
+    saveFolders();
+    saveItems();
+    renderAddFolderSelect();
+    render();
+    alert(
+      "匯入完成：新增 " + addedFolders + " 個資料夾、新增 " + addedItems + " 筆、更新 " + updatedItems + " 筆。"
+    );
+  };
+  reader.readAsText(file);
+}
+
+// ---- 單字卡：把目前勾選的單字/句子排成可列印的小卡（方案三） ----
+function exportFlashcards() {
+  const chosen = items.filter((it) => selectedIds.has(it.id));
+  if (!chosen.length) {
+    alert("請先在單字本清單裡勾選想做成單字卡的單字或句子。");
+    return;
+  }
+  $printSheet.innerHTML = "";
+  chosen.forEach((it) => {
+    const card = document.createElement("div");
+    card.className = "pcard";
+
+    const en = document.createElement("div");
+    en.className = "pcard-en";
+    en.textContent = it.text;
+    card.appendChild(en);
+
+    if (!it.sentence) {
+      const ph = document.createElement("div");
+      ph.className = "pcard-ph";
+      ph.textContent = it.phonetic ? "/ " + it.phonetic + " /" : "";
+      card.appendChild(ph);
+    }
+
+    const zh = document.createElement("div");
+    zh.className = "pcard-zh";
+    zh.textContent = it.zh || "";
+    card.appendChild(zh);
+
+    $printSheet.appendChild(card);
+  });
+  window.print();
+}
+
+// 匯出/匯入/單字卡 事件
+$exportBtn.addEventListener("click", exportData);
+$importBtn.addEventListener("click", () => $importFile.click());
+$importFile.addEventListener("change", () => {
+  const file = $importFile.files[0];
+  if (file) importData(file);
+  $importFile.value = "";
+});
+$flashcardBtn.addEventListener("click", exportFlashcards);
 
 // 循環播放開關
 $loopBtn.addEventListener("click", () => {

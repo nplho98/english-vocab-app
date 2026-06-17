@@ -179,14 +179,6 @@ body {
   border-radius: 12px; padding: 14px 18px; font-size: 1.05rem; cursor: pointer; white-space: nowrap;
 }
 .btn-loop.playing { background: var(--blue); color: #fff; }
-.scope {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
-  font-size: 0.9rem; color: var(--muted);
-}
-.scope select {
-  flex: 1; min-width: 0; padding: 12px; font-size: 1rem; border: 1px solid var(--border);
-  border-radius: 10px; background: var(--card); color: var(--text);
-}
 .speed {
   flex: 1; display: flex; align-items: center; gap: 8px;
   font-size: 0.9rem; color: var(--muted);

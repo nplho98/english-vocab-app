@@ -9,7 +9,6 @@ const $empty = document.getElementById("empty");
 const $count = document.getElementById("count");
 const $search = document.getElementById("search");
 const $loopBtn = document.getElementById("loopBtn");
-const $loopScope = document.getElementById("loopScope");
 const $speed = document.getElementById("speed");
 const $speedVal = document.getElementById("speedVal");
 const $enVoice = document.getElementById("enVoice");
@@ -98,7 +97,7 @@ function saveFolders() {
 
 let folders = loadFolders();
 let items = loadItems();
-const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放只播勾選的」用
+const selectedIds = new Set(); // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「單字卡」用
 const checkedFolderIds = new Set(); // 資料夾打勾，決定單字本顯示哪些資料夾的內容（沒勾任何資料夾＝不顯示）
 let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
 let cameraCurrent = null; // 鏡頭翻譯目前辨識出來的結果 { text, zh }
@@ -532,15 +531,8 @@ function speak(text, el) {
 }
 
 // ---- 一鍵循環播放（依目前清單順序，念完最後一筆回到第一筆）----
-// 依「播放範圍」篩選循環內容（全部 / 只單字 / 只句子）
 function loopItems() {
-  const scope = $loopScope.value;
-  return currentShownItems().filter((it) => {
-    if (scope === "word") return !it.sentence;
-    if (scope === "sentence") return it.sentence;
-    if (scope === "checked") return selectedIds.has(it.id);
-    return true;
-  });
+  return currentShownItems();
 }
 
 function startLoop() {

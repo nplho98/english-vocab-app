@@ -35,6 +35,7 @@ const $lookupResult = document.getElementById("lookupResult");
 const $lookupResultEn = document.getElementById("lookupResultEn");
 const $lookupResultPh = document.getElementById("lookupResultPh");
 const $lookupResultZh = document.getElementById("lookupResultZh");
+const $lookupSpeakBtn = document.getElementById("lookupSpeakBtn");
 
 function genId() {
   return Date.now() + "-" + Math.random().toString(36).slice(2, 6);
@@ -916,6 +917,9 @@ function renderLookupResult() {
     : "（字典查無音標）";
   $lookupResultZh.textContent = lookupCurrent.zh ? lookupCurrent.zh : "🌐 翻譯中…";
 }
+$lookupSpeakBtn.addEventListener("click", () => {
+  if (lookupCurrent) speak(lookupCurrent.text, $lookupSpeakBtn);
+});
 
 async function runLookup() {
   const text = $input.value.trim();

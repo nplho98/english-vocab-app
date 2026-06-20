@@ -85,7 +85,8 @@ body {
   padding: 16px; text-align: center; display: flex; flex-direction: column; gap: 6px;
 }
 .lookup-result.hidden { display: none; }
-.lookup-en { font-size: 1.4rem; font-weight: 700; word-break: break-word; }
+.lookup-en-row { display: flex; align-items: center; gap: 8px; }
+.lookup-en { font-size: 1.4rem; font-weight: 700; word-break: break-word; flex: 1; }
 .lookup-ph { color: var(--blue); font-family: "Times New Roman", serif; font-size: 1rem; }
 .lookup-zh { font-size: 1.1rem; color: var(--text); }
 .lookup-zh.editable { cursor: pointer; }

@@ -1021,8 +1021,36 @@ function switchTab(name) {
   }
 }
 document.querySelectorAll(".tab-btn").forEach((b) =>
-  b.addEventListener("click", () => switchTab(b.dataset.tab))
+  b.addEventListener("click", () => navigateToTab(b.dataset.tab))
 );
+
+// ---- 返回鍵導覽（手機返回鍵先退上一頁，到底才問是否離開App） ----
+let navStack = ["add"];
+history.replaceState({ tab: "add" }, "");
+
+function navigateToTab(name) {
+  if (name === navStack[navStack.length - 1]) return;
+  navStack.push(name);
+  history.pushState({ tab: name }, "");
+  switchTab(name);
+}
+
+window.addEventListener("popstate", (e) => {
+  // 循環播放鎖屏中：返回鍵直接吃掉，不解鎖、不切分頁
+  if (isLooping) {
+    history.pushState({ tab: navStack[navStack.length - 1] }, "");
+    return;
+  }
+  if (e.state && e.state.tab) {
+    navStack.pop();
+    switchTab(e.state.tab);
+    return;
+  }
+  if (confirm("確定要離開App嗎？")) {
+    return; // 不補狀態，讓返回鍵真正退出App
+  }
+  history.pushState({ tab: navStack[navStack.length - 1] }, "");
+});
 
 // ---- 複習頁 ----
 const $reviewEmpty = document.getElementById("reviewEmpty");

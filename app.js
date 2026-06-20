@@ -1026,12 +1026,23 @@ document.querySelectorAll(".tab-btn").forEach((b) =>
 
 // ---- 返回鍵導覽（手機返回鍵先退上一頁，到底才問是否離開App） ----
 // 底層多墊一筆 guard entry，讓「查詢」分頁不是 WebView history 的最底端，
-// 否則在查詢頁按返回鍵會直接被系統判斷「沒有上一頁」而關閉App，連 popstate 都不會觸發。
+// 否則在查詢頁按返回鍵會直接被系統判斷「沒有上一頁」而關閉App。
+// 注意：Chrome 的「History Manipulation Intervention」機制會讓「沒有使用者手勢
+// 就用 pushState 墊的 history entry」在按返回鍵時被直接跳過（popstate 不會觸發），
+// 所以這裡不能在 script 一載入就墊，要等第一次真實點擊/觸碰才墊。
 let navStack = ["add"];
-history.replaceState({ guard: true }, "");
-history.pushState({ tab: "add" }, "");
+let navGuardReady = false;
+
+function ensureNavGuard() {
+  if (navGuardReady) return;
+  navGuardReady = true;
+  history.replaceState({ guard: true }, "");
+  history.pushState({ tab: navStack[navStack.length - 1] }, "");
+}
+document.addEventListener("pointerdown", ensureNavGuard, { once: true });
 
 function navigateToTab(name) {
+  ensureNavGuard();
   if (name === navStack[navStack.length - 1]) return;
   navStack.push(name);
   history.pushState({ tab: name }, "");

@@ -1021,52 +1021,8 @@ function switchTab(name) {
   }
 }
 document.querySelectorAll(".tab-btn").forEach((b) =>
-  b.addEventListener("click", () => navigateToTab(b.dataset.tab))
+  b.addEventListener("click", () => switchTab(b.dataset.tab))
 );
-
-// ---- 返回鍵導覽（手機返回鍵先退上一頁，到底才問是否離開App） ----
-// 底層多墊一筆 guard entry，讓「查詢」分頁不是 WebView history 的最底端，
-// 否則在查詢頁按返回鍵會直接被系統判斷「沒有上一頁」而關閉App。
-// 注意：Chrome 的「History Manipulation Intervention」機制會讓「沒有使用者手勢
-// 就用 pushState 墊的 history entry」在按返回鍵時被直接跳過（popstate 不會觸發），
-// 所以這裡不能在 script 一載入就墊，要等第一次真實點擊/觸碰才墊。
-let navStack = ["add"];
-let navGuardReady = false;
-
-function ensureNavGuard() {
-  if (navGuardReady) return;
-  navGuardReady = true;
-  history.replaceState({ guard: true }, "");
-  history.pushState({ tab: navStack[navStack.length - 1] }, "");
-}
-document.addEventListener("pointerdown", ensureNavGuard, { once: true });
-
-function navigateToTab(name) {
-  ensureNavGuard();
-  if (name === navStack[navStack.length - 1]) return;
-  navStack.push(name);
-  history.pushState({ tab: name }, "");
-  switchTab(name);
-}
-
-window.addEventListener("popstate", (e) => {
-  // 循環播放鎖屏中：返回鍵直接吃掉，不解鎖、不切分頁
-  if (isLooping) {
-    history.pushState({ tab: navStack[navStack.length - 1] }, "");
-    return;
-  }
-  if (e.state && e.state.tab) {
-    navStack.pop();
-    switchTab(e.state.tab);
-    return;
-  }
-  // 退到底層 guard：問是否離開
-  if (confirm("確定要離開App嗎？")) {
-    window.close(); // TWA 環境下立即結束 Activity
-    return;
-  }
-  history.pushState({ tab: navStack[navStack.length - 1] }, "");
-});
 
 // ---- 複習頁 ----
 const $reviewEmpty = document.getElementById("reviewEmpty");

@@ -1025,8 +1025,11 @@ document.querySelectorAll(".tab-btn").forEach((b) =>
 );
 
 // ---- 返回鍵導覽（手機返回鍵先退上一頁，到底才問是否離開App） ----
+// 底層多墊一筆 guard entry，讓「查詢」分頁不是 WebView history 的最底端，
+// 否則在查詢頁按返回鍵會直接被系統判斷「沒有上一頁」而關閉App，連 popstate 都不會觸發。
 let navStack = ["add"];
-history.replaceState({ tab: "add" }, "");
+history.replaceState({ guard: true }, "");
+history.pushState({ tab: "add" }, "");
 
 function navigateToTab(name) {
   if (name === navStack[navStack.length - 1]) return;
@@ -1046,8 +1049,10 @@ window.addEventListener("popstate", (e) => {
     switchTab(e.state.tab);
     return;
   }
+  // 退到底層 guard：問是否離開
   if (confirm("確定要離開App嗎？")) {
-    return; // 不補狀態，讓返回鍵真正退出App
+    window.close(); // TWA 環境下立即結束 Activity
+    return;
   }
   history.pushState({ tab: navStack[navStack.length - 1] }, "");
 });

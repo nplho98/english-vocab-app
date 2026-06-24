@@ -782,6 +782,18 @@ async function exportData() {
   const json = JSON.stringify(buildExportPayload(), null, 2);
   const filename = "vocab-backup-" + new Date().toISOString().slice(0, 10) + ".json";
 
+  // 手機上優先跳系統分享面板，可直接選 LINE/其他 App 轉傳
+  const file = new File([json], filename, { type: "application/json" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "單字本備份" });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // 使用者自己取消分享
+      // 不支援或失敗就往下走，改用存檔/下載
+    }
+  }
+
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({

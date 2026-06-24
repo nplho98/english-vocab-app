@@ -364,6 +364,18 @@ function editZh(id) {
   render();
 }
 
+// ---- 手動編輯音標（字典/線上都查不到時，自己補一個）----
+function editPhonetic(id) {
+  const it = items.find((x) => x.id === id);
+  if (!it) return;
+  const v = prompt("輸入音標（不用加斜線 / /）：", it.phonetic || "");
+  if (v === null) return;
+  it.phonetic = v.trim() || null;
+  it.phoneticTried = true; // 手動填過了，背景補齊不用再打 API
+  saveItems();
+  render();
+}
+
 // ---- 刪除 ----
 function deleteItem(id) {
   items = items.filter((it) => it.id !== id);
@@ -645,12 +657,14 @@ function render() {
     } else {
       const ph = document.createElement("div");
       if (it.phonetic) {
-        ph.className = "item-phonetic";
+        ph.className = "item-phonetic editable";
         ph.textContent = "/ " + it.phonetic + " /";
       } else {
-        ph.className = "item-phonetic missing";
-        ph.textContent = "（字典查無音標）";
+        ph.className = "item-phonetic missing editable";
+        ph.textContent = "（字典查無音標，點我手動加）";
       }
+      ph.title = "點一下可手動輸入/修改音標";
+      ph.onclick = () => editPhonetic(it.id);
       main.appendChild(ph);
     }
 

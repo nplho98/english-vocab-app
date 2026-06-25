@@ -87,7 +87,7 @@ body {
 .lookup-result.hidden { display: none; }
 .lookup-en-row { display: flex; align-items: center; gap: 8px; }
 .lookup-en { font-size: 1.4rem; font-weight: 700; word-break: break-word; flex: 1; }
-.lookup-ph { color: var(--blue); font-family: "Times New Roman", serif; font-size: 1rem; }
+.lookup-ph { color: var(--blue); font-family: "Segoe UI", "Noto Sans", system-ui, sans-serif; font-size: 1rem; }
 .lookup-zh { font-size: 1.1rem; color: var(--text); }
 .lookup-zh.editable { cursor: pointer; }
 .lookup-zh.editable:active { opacity: 0.6; }
@@ -228,7 +228,7 @@ body {
 .item-zh.editable { cursor: pointer; }
 .item-zh.editable:active { opacity: 0.6; }
 .item-phonetic {
-  font-size: 0.9rem; color: var(--blue); margin-top: 3px; font-family: "Times New Roman", serif;
+  font-size: 0.9rem; color: var(--blue); margin-top: 3px; font-family: "Segoe UI", "Noto Sans", system-ui, sans-serif;
 }
 .item-phonetic.missing { color: var(--muted); font-style: italic; font-family: inherit; }
 .item-phonetic.editable { cursor: pointer; }
@@ -261,7 +261,7 @@ body {
 }
 .review-card.hidden { display: none; }
 .rc-text { font-size: 1.7rem; font-weight: 700; word-break: break-word; }
-.rc-phonetic { color: var(--blue); font-family: "Times New Roman", serif; font-size: 1.05rem; }
+.rc-phonetic { color: var(--blue); font-family: "Segoe UI", "Noto Sans", system-ui, sans-serif; font-size: 1.05rem; }
 .rc-zh { font-size: 1.2rem; color: var(--text); }
 .rc-zh.hidden { display: none; }
 .rc-full { width: 100%; padding: 14px; }
@@ -284,7 +284,7 @@ body {
     min-height: 90px; break-inside: avoid;
   }
   .pcard-en { font-weight: 700; font-size: 0.95rem; }
-  .pcard-ph { color: #2563eb; font-size: 0.72rem; font-family: "Times New Roman", serif; }
+  .pcard-ph { color: #2563eb; font-size: 0.72rem; font-family: "Segoe UI", "Noto Sans", system-ui, sans-serif; }
   .pcard-zh { font-size: 0.78rem; color: #64748b; }
 }
 

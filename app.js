@@ -51,6 +51,7 @@ function loadFolders() {
 }
 function saveFolders() {
   localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+  syncToFirestore();
 }
 
 let folders = loadFolders();
@@ -123,6 +124,7 @@ function dueItems() {
 }
 function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  syncToFirestore();
 }
 
 // ---- 判斷是單字還是句子 ----
@@ -1132,3 +1134,54 @@ backfillPhonetics();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+// ---- Firebase 雲端同步 ----
+let db = null;
+let uid = null;
+
+function syncToFirestore() {
+  if (!db || !uid) return;
+  db.collection("users").doc(uid).collection("data").doc("main")
+    .set({ items, folders });
+}
+
+function initFirebase() {
+  if (typeof firebase === "undefined") return;
+  firebase.initializeApp({
+    apiKey: "AIzaSyDq6JsRO2_FwoEsGtaiGvUcY2log58H_Js",
+    authDomain: "english-e754f.firebaseapp.com",
+    projectId: "english-e754f",
+    storageBucket: "english-e754f.firebasestorage.app",
+    messagingSenderId: "958567119066",
+    appId: "1:958567119066:web:d1bd3be1cd7b7fa03d4de3",
+  });
+  db = firebase.firestore();
+  db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+
+  firebase.auth().signInAnonymously().then((cred) => {
+    uid = cred.user.uid;
+    const ref = db.collection("users").doc(uid).collection("data").doc("main");
+    ref.onSnapshot((snap) => {
+      if (snap.metadata.hasPendingWrites) return;
+      if (!snap.exists) {
+        if (items.length > 0 || folders.length > 0) syncToFirestore();
+        return;
+      }
+      const data = snap.data();
+      items = (data.items || []).map((it) => {
+        if (typeof it.box !== "number") it.box = 0;
+        if (typeof it.due !== "number") it.due = Date.now();
+        return it;
+      });
+      folders = data.folders || [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+      render();
+      renderFolders();
+      renderAddFolderSelect();
+      updateDueBadge();
+    });
+  }).catch(console.error);
+}
+
+initFirebase();

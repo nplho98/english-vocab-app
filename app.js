@@ -52,6 +52,7 @@ function loadFolders() {
 function saveFolders() {
   localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
   syncToFirestore();
+  syncFoldersToInbox();
 }
 
 let folders = loadFolders();
@@ -1145,6 +1146,12 @@ function syncToFirestore() {
     .set({ items, folders });
 }
 
+function syncFoldersToInbox() {
+  if (!db) return;
+  db.collection("vocab-inbox").doc("folders")
+    .set({ names: folders.map(f => f.name) });
+}
+
 function initFirebase() {
   if (typeof firebase === "undefined") return;
   firebase.initializeApp({
@@ -1180,6 +1187,7 @@ function initFirebase() {
       renderFolders();
       renderAddFolderSelect();
       updateDueBadge();
+      syncFoldersToInbox();
     });
 
     // ---- 翻譯工具收件 ----
@@ -1192,9 +1200,10 @@ function initFirebase() {
       let entry;
       try { entry = JSON.parse(data.entry); } catch { return; }
 
-      let folder = folders.find(f => f.name === "翻譯工具");
+      const folderName = data.folder || "翻譯工具";
+      let folder = folders.find(f => f.name === folderName);
       if (!folder) {
-        folder = { id: genId(), name: "翻譯工具" };
+        folder = { id: genId(), name: folderName };
         folders.push(folder);
         checkedFolderIds.add(folder.id);
       }

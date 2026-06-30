@@ -954,17 +954,21 @@ async function syncFromCloud() {
       checkedFolderIds.add(target.id);
       (block.items || []).forEach(im => {
         if (!im || !im.text) return;
-        const text = im.text.trim();
-        const existing = items.find(it => it.folderId === target.id && it.text === text);
-        if (existing) {
-          existing.zh = im.zh || existing.zh;
-          existing.phonetic = im.phonetic || existing.phonetic;
-          existing.sentence = !!im.sentence;
-          updatedItems++;
-        } else {
-          items.unshift({ id: genId(), text, zh: im.zh || "", sentence: !!im.sentence, phonetic: im.phonetic || null, folderId: target.id, box: 0, due: Date.now() });
-          addedItems++;
-        }
+        const upsert = (text, zh, sentence, phonetic) => {
+          const existing = items.find(it => it.folderId === target.id && it.text === text);
+          if (existing) {
+            existing.zh = zh || existing.zh;
+            existing.phonetic = phonetic || existing.phonetic;
+            existing.sentence = sentence;
+            updatedItems++;
+          } else {
+            items.unshift({ id: genId(), text, zh: zh || "", sentence, phonetic: phonetic || null, folderId: target.id, box: 0, due: Date.now() });
+            addedItems++;
+          }
+        };
+        upsert(im.text.trim(), im.zh, !!im.sentence, im.phonetic || null);
+        if (im.example) upsert(im.example.trim(), im.exampleZh || "", true, null);
+        if (im.reply)   upsert(im.reply.trim(),   im.replyZh   || "", true, null);
       });
     });
     saveFolders(); saveItems(); saveCheckedFolderIds();

@@ -1167,6 +1167,7 @@ function initFirebase() {
 
   firebase.auth().signInAnonymously().then((cred) => {
     uid = cred.user.uid;
+    syncFoldersToInbox();
     const ref = db.collection("users").doc(uid).collection("data").doc("main");
     ref.onSnapshot((snap) => {
       if (snap.metadata.hasPendingWrites) return;

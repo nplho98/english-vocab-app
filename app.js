@@ -696,7 +696,7 @@ function render() {
     speakBtn.title = "發音";
     speakBtn.onclick = async () => {
       await speakAsync(it.text, getEnVoice(), "en-US");
-      if (it.zh) { await new Promise(r => setTimeout(r, 300)); await speakAsync(it.zh, getZhVoice(), "zh-TW"); }
+      if (it.zh) { await new Promise(r => setTimeout(r, 500)); await speakAsync(it.zh, getZhVoice(), "zh-TW"); }
     };
 
     const delBtn = document.createElement("button");

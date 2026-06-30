@@ -128,6 +128,13 @@ function saveItems() {
   syncToFirestore();
 }
 
+function purgeOrphanItems() {
+  const folderIds = new Set(folders.map(f => f.id));
+  const before = items.length;
+  items = items.filter(it => folderIds.has(it.folderId));
+  if (items.length !== before) saveItems();
+}
+
 // ---- 判斷是單字還是句子 ----
 function isSentence(text) {
   return text.trim().split(/\s+/).length > 1;
@@ -1184,6 +1191,7 @@ function initFirebase() {
       folders = data.folders || [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
       localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+      purgeOrphanItems();
       render();
       renderFolders();
       renderAddFolderSelect();

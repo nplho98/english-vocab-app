@@ -930,6 +930,54 @@ function exportFlashcards() {
   window.print();
 }
 
+// ---- 網路同步：從 Firestore 拉翻譯工具匯出的 JSON，合併進單字本（重複則覆蓋）----
+async function syncFromCloud() {
+  if (!db) { alert("雲端同步尚未就緒，請稍後再試。"); return; }
+  const btn = document.getElementById("cloudSyncBtn");
+  btn.textContent = "🔄 同步中…";
+  btn.disabled = true;
+  try {
+    const snap = await db.collection("vocab-inbox").doc("sync-export").get();
+    if (!snap.exists) { alert("雲端沒有找到資料，請先從翻譯工具匯出並上傳。"); return; }
+    const raw = snap.data().data;
+    if (!raw) { alert("雲端資料格式錯誤。"); return; }
+    let payload;
+    try { payload = JSON.parse(raw); } catch { alert("雲端資料解析失敗。"); return; }
+    if (!payload || !Array.isArray(payload.folders)) { alert("格式不符，請重新匯出上傳。"); return; }
+
+    let addedFolders = 0, addedItems = 0, updatedItems = 0;
+    payload.folders.forEach(block => {
+      if (!block || !block.name) return;
+      const name = block.name.trim();
+      let target = folders.find(f => f.name === name);
+      if (!target) { target = { id: genId(), name }; folders.push(target); addedFolders++; }
+      checkedFolderIds.add(target.id);
+      (block.items || []).forEach(im => {
+        if (!im || !im.text) return;
+        const text = im.text.trim();
+        const existing = items.find(it => it.folderId === target.id && it.text === text);
+        if (existing) {
+          existing.zh = im.zh || existing.zh;
+          existing.phonetic = im.phonetic || existing.phonetic;
+          existing.sentence = !!im.sentence;
+          updatedItems++;
+        } else {
+          items.unshift({ id: genId(), text, zh: im.zh || "", sentence: !!im.sentence, phonetic: im.phonetic || null, folderId: target.id, box: 0, due: Date.now() });
+          addedItems++;
+        }
+      });
+    });
+    saveFolders(); saveItems(); saveCheckedFolderIds();
+    renderAddFolderSelect(); render();
+    alert("網路同步完成：新增 " + addedFolders + " 個資料夾、新增 " + addedItems + " 筆、更新 " + updatedItems + " 筆。");
+  } catch (e) {
+    alert("同步失敗：" + e.message);
+  } finally {
+    btn.textContent = "🔄 網路同步";
+    btn.disabled = false;
+  }
+}
+
 // 匯出/匯入/單字卡 事件
 $exportBtn.addEventListener("click", exportData);
 $importBtn.addEventListener("click", () => $importFile.click());
@@ -939,6 +987,7 @@ $importFile.addEventListener("change", () => {
   $importFile.value = "";
 });
 $flashcardBtn.addEventListener("click", exportFlashcards);
+document.getElementById("cloudSyncBtn").addEventListener("click", syncFromCloud);
 
 // ---- 查詢：打字輸入，立刻看翻譯（中文可編輯），確認後才加入單字本 ----
 function renderLookupResult() {

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>翻譯同步上傳</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+    .box { background: #fff; border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+    h1 { font-size: 20px; color: #0f172a; margin: 0 0 8px; }
+    p { font-size: 14px; color: #64748b; margin: 0 0 24px; }
+    .drop { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 32px 16px; cursor: pointer; transition: border-color 0.2s; }
+    .drop:hover { border-color: #3b82f6; }
+    .drop input { display: none; }
+    .drop-label { font-size: 14px; color: #94a3b8; }
+    .file-name { font-size: 13px; color: #1e293b; font-weight: 600; margin-top: 8px; }
+    button { background: #3b82f6; color: #fff; border: none; border-radius: 10px; padding: 12px 28px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 20px; width: 100%; transition: background 0.2s; }
+    button:disabled { background: #cbd5e1; cursor: not-allowed; }
+    .msg { margin-top: 16px; font-size: 13px; font-weight: 600; }
+    .ok { color: #16a34a; } .err { color: #ef4444; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>📤 翻譯同步上傳</h1>
+  <p>選取從翻譯工具匯出的 vocab-trans.json，上傳後手機端按「網路同步」即可更新。</p>
+  <div class="drop" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".json,application/json" onchange="onFile(this)" />
+    <div class="drop-label">點此選取 JSON 檔案</div>
+    <div class="file-name" id="fileName"></div>
+  </div>
+  <button id="uploadBtn" disabled onclick="upload()">上傳到雲端</button>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+  const FIRESTORE = "https://firestore.googleapis.com/v1/projects/english-e754f/databases/(default)/documents/vocab-inbox/sync-export";
+  let fileContent = null;
+
+  function onFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    document.getElementById("fileName").textContent = file.name;
+    document.getElementById("msg").textContent = "";
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        JSON.parse(reader.result);
+        fileContent = reader.result;
+        document.getElementById("uploadBtn").disabled = false;
+      } catch {
+        document.getElementById("msg").className = "msg err";
+        document.getElementById("msg").textContent = "檔案格式錯誤，請選正確的 JSON 檔。";
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function upload() {
+    if (!fileContent) return;
+    const btn = document.getElementById("uploadBtn");
+    const msg = document.getElementById("msg");
+    btn.disabled = true;
+    btn.textContent = "上傳中…";
+    msg.textContent = "";
+    try {
+      const res = await fetch(FIRESTORE, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fields: {
+            data: { stringValue: fileContent },
+            updatedAt: { stringValue: new Date().toISOString() }
+          }
+        })
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      msg.className = "msg ok";
+      msg.textContent = "✅ 上傳成功！手機端可以按「網路同步」了。";
+    } catch (e) {
+      msg.className = "msg err";
+      msg.textContent = "❌ 上傳失敗：" + e.message;
+    }
+    btn.disabled = false;
+    btn.textContent = "上傳到雲端";
+  }
+</script>
+</body>
+</html>

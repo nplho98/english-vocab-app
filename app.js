@@ -962,7 +962,7 @@ async function syncFromCloud() {
             existing.sentence = sentence;
             updatedItems++;
           } else {
-            items.unshift({ id: genId(), text, zh: zh || "", sentence, phonetic: phonetic || null, folderId: target.id, box: 0, due: Date.now() });
+            items.push({ id: genId(), text, zh: zh || "", sentence, phonetic: phonetic || null, folderId: target.id, box: 0, due: Date.now() });
             addedItems++;
           }
         };

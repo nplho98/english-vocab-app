@@ -694,7 +694,10 @@ function render() {
     speakBtn.className = "icon-btn speak-btn";
     speakBtn.textContent = "🔊";
     speakBtn.title = "發音";
-    speakBtn.onclick = () => speak(it.text, li);
+    speakBtn.onclick = async () => {
+      await speakAsync(it.text, getEnVoice(), "en-US");
+      if (it.zh) { await new Promise(r => setTimeout(r, 300)); await speakAsync(it.zh, getZhVoice(), "zh-TW"); }
+    };
 
     const delBtn = document.createElement("button");
     delBtn.className = "icon-btn del-btn";

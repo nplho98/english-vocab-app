@@ -1181,7 +1181,53 @@ function initFirebase() {
       renderAddFolderSelect();
       updateDueBadge();
     });
+
+    // ---- 翻譯工具收件 ----
+    const inboxStartTs = Date.now();
+    db.collection("vocab-inbox").doc("latest").onSnapshot((snap) => {
+      if (!snap.exists) return;
+      const data = snap.data();
+      const ts = parseInt(data.ts) || 0;
+      if (ts < inboxStartTs) return;
+      let entry;
+      try { entry = JSON.parse(data.entry); } catch { return; }
+
+      let folder = folders.find(f => f.name === "翻譯工具");
+      if (!folder) {
+        folder = { id: genId(), name: "翻譯工具" };
+        folders.push(folder);
+        checkedFolderIds.add(folder.id);
+      }
+
+      let text, zh, phonetic = null, sentence = false;
+      if (entry.type === "en_word") {
+        text = entry.input; zh = entry.translation; phonetic = entry.kk || null;
+      } else if (entry.type === "en_sentence") {
+        text = entry.input; zh = entry.translation; sentence = true;
+      } else if (entry.type === "zh_to_en") {
+        text = entry.translation; zh = entry.input;
+        sentence = text.trim().split(/\s+/).length > 1;
+      } else { return; }
+
+      if (items.some(it => it.folderId === folder.id && it.text === text)) return;
+      items.unshift({ id: genId(), text, zh, phonetic, sentence, folderId: folder.id, box: 0, due: Date.now() });
+      saveItems();
+      saveFolders();
+      saveCheckedFolderIds();
+      render();
+      renderFolders();
+      renderAddFolderSelect();
+      showToast(`已加入：${text}`);
+    });
   }).catch(console.error);
+}
+
+function showToast(msg) {
+  const t = document.createElement("div");
+  t.textContent = msg;
+  t.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;z-index:9999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.2);pointer-events:none";
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
 }
 
 initFirebase();

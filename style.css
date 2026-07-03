@@ -340,3 +340,42 @@ body {
 .quiz-feedback { min-height: 1.2em; font-weight: 700; margin: 6px 0; }
 .quiz-feedback.ok { color: #16a34a; }
 .quiz-feedback.err { color: var(--danger); }
+
+/* ---- 資料夾五大分類標題 ---- */
+.cat-head {
+  font-size: 0.82rem; font-weight: 700; color: var(--muted);
+  margin-top: 8px; padding-bottom: 2px; border-bottom: 1px dashed var(--border);
+}
+.cat-head:first-child { margin-top: 0; }
+
+/* ---- 例句獨立播放按鈕 ---- */
+.ex-en-row { display: flex; align-items: center; gap: 6px; }
+.ex-en-row .ex-en { flex: 1; }
+.ex-speak {
+  border: none; background: #eff6ff; border-radius: 8px;
+  width: 30px; height: 30px; font-size: 0.85rem; cursor: pointer;
+  display: grid; place-items: center; flex-shrink: 0; padding: 0;
+}
+.ex-speak:active { transform: scale(0.92); }
+
+/* ---- 例句填空 ---- */
+.cloze-sentence {
+  font-size: 1.15rem; font-weight: 600; line-height: 1.6;
+  word-break: break-word; text-align: center;
+}
+.cloze-options { grid-template-columns: 1fr 1fr; width: 100%; }
+.cloze-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  position: relative; padding: 12px 8px 10px;
+}
+.cloze-opt .opt-word { font-size: 1.05rem; font-weight: 700; word-break: break-word; }
+.cloze-opt .opt-ph {
+  font-size: 0.75rem; font-weight: 400; color: var(--blue);
+  font-family: "Segoe UI", "Noto Sans", system-ui, sans-serif;
+}
+.cloze-opt.correct .opt-ph, .cloze-opt.wrong .opt-ph { color: inherit; }
+.cloze-opt .opt-speak {
+  font-size: 1rem; padding: 4px 10px; border-radius: 8px; background: #eff6ff;
+}
+.cloze-opt .opt-speak:active { transform: scale(0.92); }
+#clozeCard .ex-ph, #clozeCard .ex-zh { text-align: center; }

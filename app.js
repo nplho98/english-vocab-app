@@ -55,7 +55,26 @@ function saveFolders() {
   syncFoldersToInbox();
 }
 
+// ---- 五大分類（固定兩層：分類 → 資料夾）----
+const CATEGORIES = ["國小", "國中初階", "國中中階", "國中高階", "日常生活常用"];
+function guessCat(name) {
+  if (/^國小L\d/.test(name)) return "國小";
+  if (/^國中初階L\d/.test(name)) return "國中初階";
+  if (/^國中中階L\d/.test(name)) return "國中中階";
+  if (/^國中高階L\d/.test(name)) return "國中高階";
+  return "日常生活常用";
+}
+// 舊資料夾沒有分類欄位：內建單字包資料夾照名稱歸位，其餘（Boss 自建）歸日常生活常用
+function migrateFolderCats(list) {
+  list.forEach((f) => { if (!CATEGORIES.includes(f.cat)) f.cat = guessCat(f.name); });
+}
+function folderCatOf(folderId) {
+  const f = folders.find((x) => x.id === folderId);
+  return (f && f.cat) || "日常生活常用";
+}
+
 let folders = loadFolders();
+migrateFolderCats(folders);
 let items = loadItems();
 
 // 清單裡個別勾選的單字/句子，給「刪除所選」「全選」「循環播放」「單字卡」用；存進 localStorage，關閉 App 不會忘記
@@ -119,9 +138,12 @@ const SRS_INTERVALS = [10 * 60 * 1000, SRS_DAY, 2 * SRS_DAY, 4 * SRS_DAY, 7 * SR
 function nextDue(box) {
   return Date.now() + SRS_INTERVALS[Math.min(box, SRS_INTERVALS.length - 1)];
 }
+// 複習/測驗一律只從「目前勾選的資料夾」出題
 function dueItems() {
   const now = Date.now();
-  return items.filter((it) => (it.due || 0) <= now).sort((a, b) => (a.due || 0) - (b.due || 0));
+  return items
+    .filter((it) => (it.due || 0) <= now && checkedFolderIds.has(it.folderId))
+    .sort((a, b) => (a.due || 0) - (b.due || 0));
 }
 function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
@@ -140,30 +162,94 @@ function isSentence(text) {
   return text.trim().split(/\s+/).length > 1;
 }
 
+// ---- 內建單字包註冊表：國小＋國中三級，缺檔的自動略過 ----
+const PACKS = [
+  { key: "sp", cat: "國小", label: "國小", prefix: "國小L", data: typeof STARTER_PACK !== "undefined" ? STARTER_PACK : [] },
+  { key: "j1", cat: "國中初階", label: "國中初階", prefix: "國中初階L", data: typeof JHS1_PACK !== "undefined" ? JHS1_PACK : [] },
+  { key: "j2", cat: "國中中階", label: "國中中階", prefix: "國中中階L", data: typeof JHS2_PACK !== "undefined" ? JHS2_PACK : [] },
+  { key: "j3", cat: "國中高階", label: "國中高階", prefix: "國中高階L", data: typeof JHS3_PACK !== "undefined" ? JHS3_PACK : [] },
+];
+
 // ---- 整句音標：逐字查（內建字典→句子補充表→單字包），查不到的字原樣顯示 ----
 const SENT_PH = (() => {
   const m = {};
   if (typeof PHONETIC_DICT !== "undefined") Object.assign(m, PHONETIC_DICT);
   if (typeof SENTENCE_PHONETICS !== "undefined") Object.assign(m, SENTENCE_PHONETICS);
-  if (typeof STARTER_PACK !== "undefined")
-    STARTER_PACK.forEach((l) => l.words.forEach((w) => { m[w.t.toLowerCase()] = w.ph; }));
+  if (typeof SENT_PH_EXTRA !== "undefined") Object.assign(m, SENT_PH_EXTRA);
+  PACKS.forEach((p) => p.data.forEach((l) => l.words.forEach((w) => { m[w.t.toLowerCase()] = w.ph; })));
   return m;
 })();
+
+// ---- 音標標音節：ba·nan·a 式分界 ----
+// ponytail: 「母音核＋前一個子音」啟發式切音節，個別怪字靠手動改音標修正
+function syllabify(ph) {
+  if (!ph) return ph;
+  const parts = ph.split(/(?=[ˈˌ])/).filter(Boolean); // 重音符本身就是音節邊界
+  const out = parts.map((part) => {
+    const stress = /^[ˈˌ]/.test(part) ? part[0] : "";
+    const seg = stress ? part.slice(1) : part;
+    const vowels = [...seg.matchAll(/aɪ|aʊ|ɔɪ|[ieuoæɛɪʊɔəʌɑɝɚ]/g)];
+    if (vowels.length <= 1) return stress + seg;
+    const sylls = [];
+    let last = 0;
+    for (let i = 1; i < vowels.length; i++) {
+      const prevEnd = vowels[i - 1].index + vowels[i - 1][0].length;
+      let cut = vowels[i].index > prevEnd ? vowels[i].index - 1 : vowels[i].index;
+      if (cut > last && /^(tʃ|dʒ)/.test(seg.slice(cut - 1))) cut--; // tʃ/dʒ 是一個子音，不拆開
+      sylls.push(seg.slice(last, cut));
+      last = cut;
+    }
+    sylls.push(seg.slice(last));
+    return stress + sylls.join("·");
+  });
+  return out.join("·");
+}
+function phDisplay(ph) {
+  return ph ? "/ " + syllabify(ph) + " /" : "";
+}
+// ponytail: 查不到的字剝 s/es/ed/ing 變化形回查基底字，依尾音接 s/z/ɪz、t/d/ɪd、ɪŋ
+function tokenPhonetic(tok) {
+  if (SENT_PH[tok]) return SENT_PH[tok];
+  const sTail = (ph) => (/[ptkfθ]$/.test(ph) ? "s" : /(s|z|ʃ|ʒ|tʃ|dʒ)$/.test(ph) ? "ɪz" : "z");
+  const dTail = (ph) => (/[td]$/.test(ph) ? "ɪd" : /[pkfsʃθ]$/.test(ph) || /tʃ$/.test(ph) ? "t" : "d");
+  const tries = [];
+  if (/es$/.test(tok)) tries.push([tok.slice(0, -2), sTail]);
+  if (/s$/.test(tok) && !/ss$/.test(tok)) tries.push([tok.slice(0, -1), sTail]);
+  if (/ed$/.test(tok)) tries.push([tok.slice(0, -2), dTail], [tok.slice(0, -1), dTail]);
+  if (/ing$/.test(tok)) {
+    const stem = tok.slice(0, -3);
+    tries.push([stem, () => "ɪŋ"], [stem + "e", () => "ɪŋ"]);
+    if (/(.)\1$/.test(stem)) tries.push([stem.slice(0, -1), () => "ɪŋ"]);
+  }
+  if (/ly$/.test(tok)) tries.push([tok.slice(0, -2), () => "li"]);
+  for (const [base, tail] of tries) {
+    if (SENT_PH[base]) return SENT_PH[base] + tail(SENT_PH[base]);
+  }
+  return null;
+}
 function sentencePhonetic(text) {
   return text.toLowerCase().replace(/’/g, "'").split(/[^a-z']+/).filter(Boolean)
-    .map((w) => SENT_PH[w.replace(/^'+|'+$/g, "")] || w).join(" ");
+    .map((w) => { const t = w.replace(/^'+|'+$/g, ""); return tokenPhonetic(t) || w; }).join(" ");
 }
 
-// 例句/回覆句顯示列：英文（點了發音）＋整句音標＋中文
+// 例句/回覆句顯示列：英文（點了發音）＋獨立播放按鈕＋整句音標＋中文
 function exLine(icon, en, zh) {
   const row = document.createElement("div");
   row.className = "ex-line";
+  const enRow = document.createElement("div");
+  enRow.className = "ex-en-row";
   const enEl = document.createElement("div");
   enEl.className = "ex-en";
   enEl.textContent = icon + " " + en;
   enEl.title = "點一下發音";
   enEl.onclick = () => speak(en);
-  row.appendChild(enEl);
+  const spkBtn = document.createElement("button");
+  spkBtn.className = "ex-speak";
+  spkBtn.textContent = "🔊";
+  spkBtn.title = "播放這一句";
+  spkBtn.onclick = (e) => { e.stopPropagation(); speak(en); };
+  enRow.append(enEl, spkBtn);
+  row.appendChild(enRow);
   const phEl = document.createElement("div");
   phEl.className = "ex-ph";
   phEl.textContent = "/ " + sentencePhonetic(en) + " /";
@@ -286,7 +372,8 @@ function deleteSelected() {
 function addFolder() {
   const name = prompt("新資料夾名稱：");
   if (!name || !name.trim()) return;
-  const f = { id: genId(), name: name.trim() };
+  // Boss 自建的資料夾一律歸「日常生活常用」分類
+  const f = { id: genId(), name: name.trim(), cat: "日常生活常用" };
   folders.push(f);
   checkedFolderIds.add(f.id); // 新建的資料夾直接打勾，馬上看得到
   saveCheckedFolderIds();
@@ -338,7 +425,19 @@ function renderFolders() {
   const $folderSummaryCount = document.getElementById("folderSummaryCount");
   if ($folderSummaryCount) $folderSummaryCount.textContent = folders.length;
 
-  folders.forEach((f) => {
+  // 兩層結構：五大分類當標題，底下列各自的資料夾（空分類也顯示，讓 Boss 知道有這一類）
+  CATEGORIES.forEach((cat) => {
+    const catFolders = folders.filter((f) => (f.cat || "日常生活常用") === cat);
+    const head = document.createElement("div");
+    head.className = "cat-head";
+    const total = catFolders.reduce((n, f) => n + items.filter((it) => it.folderId === f.id).length, 0);
+    head.textContent = "📂 " + cat + "（" + catFolders.length + " 夾 / " + total + " 筆）";
+    $folderList.appendChild(head);
+    catFolders.forEach((f) => renderFolderChip(f));
+  });
+}
+
+function renderFolderChip(f) {
     const count = items.filter((it) => it.folderId === f.id).length;
     const chip = document.createElement("div");
     chip.className = "folder-chip";
@@ -374,7 +473,6 @@ function renderFolders() {
     chip.appendChild(delBtn);
 
     $folderList.appendChild(chip);
-  });
 }
 
 // 資料夾下拉選單共用：把目前的資料夾填進去，預選上次用過的那個
@@ -719,7 +817,7 @@ function render() {
       const ph = document.createElement("div");
       if (it.phonetic) {
         ph.className = "item-phonetic editable";
-        ph.textContent = "/ " + it.phonetic + " /";
+        ph.textContent = phDisplay(it.phonetic);
       } else {
         ph.className = "item-phonetic missing editable";
         ph.textContent = "（字典查無音標，點我手動加）";
@@ -835,6 +933,7 @@ function buildExportPayload() {
     exportedAt: new Date().toISOString(),
     folders: folders.map((f) => ({
       name: f.name,
+      cat: f.cat || "日常生活常用",
       items: items
         .filter((it) => it.folderId === f.id)
         .map((it) => ({
@@ -910,7 +1009,7 @@ function mergePayload(payload) {
     const name = block.name.trim();
     let target = folders.find((f) => f.name === name);
     if (!target) {
-      target = { id: genId(), name };
+      target = { id: genId(), name, cat: CATEGORIES.includes(block.cat) ? block.cat : guessCat(name) };
       folders.push(target);
       addedFolders++;
     }
@@ -993,7 +1092,7 @@ function exportFlashcards() {
     if (!it.sentence) {
       const ph = document.createElement("div");
       ph.className = "pcard-ph";
-      ph.textContent = it.phonetic ? "/ " + it.phonetic + " /" : "";
+      ph.textContent = phDisplay(it.phonetic);
       card.appendChild(ph);
     }
 
@@ -1053,7 +1152,7 @@ function renderLookupResult() {
   $lookupResultPh.textContent = lookupCurrent.sentence
     ? ""
     : lookupCurrent.phonetic
-    ? "/ " + lookupCurrent.phonetic + " /"
+    ? phDisplay(lookupCurrent.phonetic)
     : "（字典查無音標）";
   $lookupResultZh.textContent = lookupCurrent.zh ? lookupCurrent.zh : "🌐 翻譯中…";
 }
@@ -1201,7 +1300,7 @@ function renderReview() {
   if (it.sentence) {
     $rcPhonetic.textContent = "";
   } else {
-    $rcPhonetic.textContent = it.phonetic ? "/ " + it.phonetic + " /" : "";
+    $rcPhonetic.textContent = phDisplay(it.phonetic);
   }
   // 蓋住中文，等使用者先回想
   $rcZh.textContent = it.zh ? it.zh : "（沒有中文）";
@@ -1270,23 +1369,29 @@ function bumpDailyDone() {
   s.done++;
   localStorage.setItem(DAILY_STATE_KEY, JSON.stringify(s));
 }
+// 學習來源：四個內建單字包擇一（記住上次選的）
+const LEARN_PACK_KEY = "learn_pack";
+function currentPack() {
+  const key = localStorage.getItem(LEARN_PACK_KEY);
+  return PACKS.find((p) => p.key === key && p.data.length) || PACKS.find((p) => p.data.length) || PACKS[0];
+}
 // 下一個還沒學過的字（單字本裡已有的跳過，換裝置匯入備份也不會重複）
 function nextPackWord() {
-  if (typeof STARTER_PACK === "undefined") return null;
+  const pack = currentPack();
   const learned = new Set(items.map((it) => it.text.toLowerCase()));
-  for (const lv of STARTER_PACK) {
+  for (const lv of pack.data) {
     for (const w of lv.words) {
-      if (!learned.has(w.t.toLowerCase())) return { ...w, level: lv.level };
+      if (!learned.has(w.t.toLowerCase())) return { ...w, level: lv.level, pack };
     }
   }
   return null;
 }
-// 新字收進對應等級的資料夾（沒有就自動建）
-function packFolderId(level) {
-  const name = "國小L" + level;
+// 新字收進「所屬分類」底下對應等級的資料夾（沒有就自動建）
+function packFolderId(pack, level) {
+  const name = pack.prefix + level;
   let f = folders.find((x) => x.name === name);
   if (!f) {
-    f = { id: genId(), name };
+    f = { id: genId(), name, cat: pack.cat };
     folders.push(f);
     saveFolders();
   }
@@ -1295,14 +1400,33 @@ function packFolderId(level) {
   return f.id;
 }
 
+function renderPackSelect() {
+  const $sel = document.getElementById("packSelect");
+  if (!$sel) return;
+  const cur = currentPack();
+  $sel.innerHTML = "";
+  PACKS.forEach((p) => {
+    const total = p.data.reduce((n, l) => n + l.words.length, 0);
+    const opt = document.createElement("option");
+    opt.value = p.key;
+    opt.textContent = "📦 " + p.label + "單字包（" + total + " 字）";
+    opt.disabled = !total;
+    if (p.key === cur.key) opt.selected = true;
+    $sel.appendChild(opt);
+  });
+}
+
 function renderDaily() {
   const s = dailyState();
   const goal = dailyGoal();
   document.getElementById("dailyProgress").textContent = s.done + " / " + goal;
   document.getElementById("dailyGoalInput").value = goal;
+  renderPackSelect();
+  const pack = currentPack();
+  const total = pack.data.reduce((n, l) => n + l.words.length, 0);
   const next = nextPackWord();
   $learnBtn.disabled = !next;
-  if (!next) $learnBtn.textContent = "🏆 單字包 300 字全部學完！";
+  if (!next) $learnBtn.textContent = "🏆 " + pack.label + "單字包 " + total + " 字全部學完！";
   else if (s.done >= goal) $learnBtn.textContent = "🎉 今日達成，再多學一個";
   else $learnBtn.textContent = "🎧 學新字";
 }
@@ -1329,9 +1453,9 @@ function showLearnCard() {
   renderDaily();
   if (!learnCurrent) { $learnCard.classList.add("hidden"); return; }
   const w = learnCurrent;
-  document.getElementById("lcLevel").textContent = "國小 Level " + w.level;
+  document.getElementById("lcLevel").textContent = w.pack.label + " Level " + w.level;
   document.getElementById("lcText").textContent = w.t;
-  document.getElementById("lcPhonetic").textContent = "/ " + w.ph + " /";
+  document.getElementById("lcPhonetic").textContent = phDisplay(w.ph);
   document.getElementById("lcZh").textContent = w.zh;
   const $lcEx = document.getElementById("lcExample");
   $lcEx.innerHTML = "";
@@ -1354,7 +1478,7 @@ function saveLearnCurrent() {
     exampleZh: w.exZh,
     reply: w.re,
     replyZh: w.reZh,
-    folderId: packFolderId(w.level),
+    folderId: packFolderId(w.pack, w.level),
     box: 0,
     due: Date.now(),
   });
@@ -1382,19 +1506,26 @@ document.getElementById("dailyGoalInput").addEventListener("change", (e) => {
   if (n >= 1 && n <= 50) localStorage.setItem(DAILY_GOAL_KEY, n);
   renderDaily();
 });
+document.getElementById("packSelect").addEventListener("change", (e) => {
+  localStorage.setItem(LEARN_PACK_KEY, e.target.value);
+  learnCurrent = null;
+  window.speechSynthesis.cancel();
+  $learnCard.classList.add("hidden");
+  renderDaily();
+});
 
 // ---- 聽力測驗：念英文選中文，答完把例句對話念一遍補強 ----
 let quizCurrent = null;
 let quizScore = { right: 0, total: 0 };
 
 function quizPool() {
+  // 出題只從目前勾選的資料夾抽（dueItems 已過濾，後備清單也要過濾）
   const due = dueItems().filter((it) => it.zh);
-  return due.length ? due : items.filter((it) => it.zh);
+  return due.length ? due : items.filter((it) => it.zh && checkedFolderIds.has(it.folderId));
 }
 function allZhChoices() {
   const set = new Set(items.map((it) => it.zh).filter(Boolean));
-  if (typeof STARTER_PACK !== "undefined")
-    STARTER_PACK.forEach((l) => l.words.forEach((w) => set.add(w.zh)));
+  PACKS.forEach((p) => p.data.forEach((l) => l.words.forEach((w) => set.add(w.zh))));
   return [...set];
 }
 function startQuiz() {
@@ -1406,6 +1537,7 @@ function startQuiz() {
   $reviewCard.classList.add("hidden");
   $reviewEmpty.classList.add("hidden");
   $learnCard.classList.add("hidden");
+  document.getElementById("clozeCard").classList.add("hidden");
   document.getElementById("quizCard").classList.remove("hidden");
   nextQuizQuestion();
 }
@@ -1481,6 +1613,155 @@ function stopQuiz() {
   renderReview();
 }
 
+// ---- 例句填空：例句挖掉目標單字，四個相近選項（各附音節音標＋播放）----
+let clozeCurrent = null;
+let clozeScore = { right: 0, total: 0 };
+
+// ponytail: 順便吃掉 s/es/ed/ing 等常見變化形，例句用複數/過去式也能挖空
+function wordRe(w) {
+  return new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(s|es|d|ed|ing)?\\b", "i");
+}
+// 只出「例句裡真的含有該單字原形」的單字題
+function clozePool() {
+  const ok = (it) => !it.sentence && it.example && wordRe(it.text).test(it.example);
+  const due = dueItems().filter(ok);
+  return due.length ? due : items.filter((it) => checkedFolderIds.has(it.folderId) && ok(it));
+}
+// ponytail: 相似度＝共同字首×2＋同字尾＋長度差扣分的啟發式，選項夠像就好
+function wordSim(a, b) {
+  a = a.toLowerCase(); b = b.toLowerCase();
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i * 2 + (a.slice(-2) === b.slice(-2) ? 2 : 0) - Math.abs(a.length - b.length);
+}
+// 干擾項先從同分類（單字包＋單字本）抽最像的，不夠再從全部單字包補
+function clozeChoices(it) {
+  const cat = folderCatOf(it.folderId);
+  const seen = new Set([it.text.toLowerCase()]);
+  const cand = [];
+  const addWord = (t, ph) => {
+    const k = t.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    cand.push({ t, ph });
+  };
+  PACKS.filter((p) => p.cat === cat).forEach((p) =>
+    p.data.forEach((l) => l.words.forEach((w) => addWord(w.t, w.ph))));
+  items.forEach((x) => {
+    if (!x.sentence && x.id !== it.id && folderCatOf(x.folderId) === cat) addWord(x.text, x.phonetic);
+  });
+  if (cand.length < 3)
+    PACKS.forEach((p) => p.data.forEach((l) => l.words.forEach((w) => addWord(w.t, w.ph))));
+  cand.sort((x, y) => wordSim(y.t, it.text) - wordSim(x.t, it.text));
+  const top = cand.slice(0, 8), picks = [];
+  while (picks.length < 3 && top.length)
+    picks.push(top.splice(Math.floor(Math.random() * top.length), 1)[0]);
+  const opts = [{ t: it.text, ph: it.phonetic }, ...picks];
+  opts.sort(() => Math.random() - 0.5);
+  return opts;
+}
+
+function startCloze() {
+  if (!clozePool().length) {
+    alert("勾選的資料夾裡還沒有「附例句」的單字可以出題，先按「🎧 學新字」學幾個吧！");
+    return;
+  }
+  clozeScore = { right: 0, total: 0 };
+  $reviewCard.classList.add("hidden");
+  $reviewEmpty.classList.add("hidden");
+  $learnCard.classList.add("hidden");
+  document.getElementById("quizCard").classList.add("hidden");
+  document.getElementById("clozeCard").classList.remove("hidden");
+  nextClozeQuestion();
+}
+function nextClozeQuestion() {
+  const pool = clozePool();
+  if (!pool.length) { stopCloze(); return; }
+  let it = pool[Math.floor(Math.random() * pool.length)];
+  while (clozeCurrent && pool.length > 1 && it.id === clozeCurrent.id) {
+    it = pool[Math.floor(Math.random() * pool.length)];
+  }
+  clozeCurrent = it;
+  const re = wordRe(it.text);
+  // 句子：目標字挖空、其餘照常；整句音標在挖空處留白（無任何提示）
+  document.getElementById("clozeSentence").textContent = it.example.replace(re, "______");
+  document.getElementById("clozePh").textContent =
+    "/ " + sentencePhonetic(it.example.replace(re, "BLANKSLOT")).replace(/blankslot/g, "＿＿") + " /";
+  document.getElementById("clozeZh").textContent = it.exampleZh || "";
+  const $opts = document.getElementById("clozeOptions");
+  $opts.innerHTML = "";
+  clozeChoices(it).forEach((o) => {
+    const b = document.createElement("button");
+    b.className = "quiz-opt cloze-opt";
+    b.dataset.word = o.t;
+    const w = document.createElement("div");
+    w.className = "opt-word";
+    w.textContent = o.t;
+    const p = document.createElement("div");
+    p.className = "opt-ph";
+    p.textContent = phDisplay(o.ph);
+    const s = document.createElement("span");
+    s.className = "opt-speak";
+    s.textContent = "🔊";
+    s.title = "播放這個字";
+    s.onclick = (e) => {
+      e.stopPropagation();
+      window.speechSynthesis.cancel();
+      speakAsync(o.t, getEnVoice(), "en-US");
+    };
+    b.append(w, p, s);
+    b.onclick = () => answerCloze(b, o.t);
+    $opts.appendChild(b);
+  });
+  const $fb = document.getElementById("clozeFeedback");
+  $fb.textContent = "";
+  $fb.className = "quiz-feedback";
+  document.getElementById("clozeNext").classList.add("hidden");
+  updateClozeScore();
+  window.speechSynthesis.cancel();
+}
+async function answerCloze(btn, word) {
+  if (!clozeCurrent) return;
+  const it = clozeCurrent;
+  const right = word.toLowerCase() === it.text.toLowerCase();
+  clozeScore.total++;
+  if (right) clozeScore.right++;
+  document.querySelectorAll(".cloze-opt").forEach((b) => {
+    b.disabled = true;
+    if (b.dataset.word.toLowerCase() === it.text.toLowerCase()) b.classList.add("correct");
+  });
+  if (!right) btn.classList.add("wrong");
+  // 揭曉：句子與音標把空格補回正解
+  document.getElementById("clozeSentence").textContent = it.example;
+  document.getElementById("clozePh").textContent = "/ " + sentencePhonetic(it.example) + " /";
+  const $fb = document.getElementById("clozeFeedback");
+  $fb.textContent = right ? "✅ 答對了！" : "❌ 正確答案：" + it.text;
+  $fb.className = "quiz-feedback " + (right ? "ok" : "err");
+  applyGrade(it, right); // 接回間隔重複：答對拉長、答錯歸零
+  updateDueBadge();
+  updateClozeScore();
+  document.getElementById("clozeNext").classList.remove("hidden");
+  // 補強：完整例句對話念一遍
+  window.speechSynthesis.cancel();
+  await speakAsync(it.example, getEnVoice(), "en-US");
+  if (clozeCurrent !== it || !it.reply) return;
+  await speakAsync(it.reply, getEnVoice(), "en-US");
+}
+function updateClozeScore() {
+  document.getElementById("clozeScore").textContent =
+    clozeScore.total ? "答對 " + clozeScore.right + " / " + clozeScore.total : "";
+}
+function stopCloze() {
+  clozeCurrent = null;
+  window.speechSynthesis.cancel();
+  document.getElementById("clozeCard").classList.add("hidden");
+  renderReview();
+}
+
+document.getElementById("clozeBtn").addEventListener("click", startCloze);
+document.getElementById("clozeNext").addEventListener("click", nextClozeQuestion);
+document.getElementById("clozeStop").addEventListener("click", stopCloze);
+
 document.getElementById("quizBtn").addEventListener("click", startQuiz);
 document.getElementById("quizSpeak").addEventListener("click", () => {
   if (!quizCurrent) return;
@@ -1547,6 +1828,7 @@ function initFirebase() {
         return it;
       });
       folders = data.folders || [];
+      migrateFolderCats(folders);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
       localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
       purgeOrphanItems();
@@ -1570,7 +1852,7 @@ function initFirebase() {
       const folderName = data.folder || "翻譯工具";
       let folder = folders.find(f => f.name === folderName);
       if (!folder) {
-        folder = { id: genId(), name: folderName };
+        folder = { id: genId(), name: folderName, cat: guessCat(folderName) };
         folders.push(folder);
         checkedFolderIds.add(folder.id);
       }

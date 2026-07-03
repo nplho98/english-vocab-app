@@ -140,6 +140,43 @@ function isSentence(text) {
   return text.trim().split(/\s+/).length > 1;
 }
 
+// ---- 整句音標：逐字查（內建字典→句子補充表→單字包），查不到的字原樣顯示 ----
+const SENT_PH = (() => {
+  const m = {};
+  if (typeof PHONETIC_DICT !== "undefined") Object.assign(m, PHONETIC_DICT);
+  if (typeof SENTENCE_PHONETICS !== "undefined") Object.assign(m, SENTENCE_PHONETICS);
+  if (typeof STARTER_PACK !== "undefined")
+    STARTER_PACK.forEach((l) => l.words.forEach((w) => { m[w.t.toLowerCase()] = w.ph; }));
+  return m;
+})();
+function sentencePhonetic(text) {
+  return text.toLowerCase().replace(/’/g, "'").split(/[^a-z']+/).filter(Boolean)
+    .map((w) => SENT_PH[w.replace(/^'+|'+$/g, "")] || w).join(" ");
+}
+
+// 例句/回覆句顯示列：英文（點了發音）＋整句音標＋中文
+function exLine(icon, en, zh) {
+  const row = document.createElement("div");
+  row.className = "ex-line";
+  const enEl = document.createElement("div");
+  enEl.className = "ex-en";
+  enEl.textContent = icon + " " + en;
+  enEl.title = "點一下發音";
+  enEl.onclick = () => speak(en);
+  row.appendChild(enEl);
+  const phEl = document.createElement("div");
+  phEl.className = "ex-ph";
+  phEl.textContent = "/ " + sentencePhonetic(en) + " /";
+  row.appendChild(phEl);
+  if (zh) {
+    const zhEl = document.createElement("div");
+    zhEl.className = "ex-zh";
+    zhEl.textContent = zh;
+    row.appendChild(zhEl);
+  }
+  return row;
+}
+
 // ---- 線上翻譯（混合方案的後援；沒網路就回 null）----
 async function translateOnline(text) {
   // 1) Google 非官方端點（瀏覽器可跨域）
@@ -204,10 +241,10 @@ async function backfillPhonetics() {
         if (ph) it.phonetic = ph;
         it.phoneticTried = true; // 標記已查過，避免每次開啟重打
         saveItems();
-        render();
       }
       await new Promise((r) => setTimeout(r, 300)); // 別打太快
     }
+    if (targets.length) render(); // 全部補完才重畫一次，清單不會一直跳動
   } finally {
     backfilling = false;
   }
@@ -564,6 +601,20 @@ function startLoop() {
       await speakAsync(it.zh, getZhVoice(), "zh-TW");
       if (!isLooping) return;
     }
+    // 例句＋回覆句（若有）：英文→中文
+    for (const [en, zhTxt] of [[it.example, it.exampleZh], [it.reply, it.replyZh]]) {
+      if (!en) continue;
+      await new Promise((r) => setTimeout(r, 250));
+      if (!isLooping) return;
+      await speakAsync(en, getEnVoice(), "en-US");
+      if (!isLooping) return;
+      if (zhTxt) {
+        await new Promise((r) => setTimeout(r, 250));
+        if (!isLooping) return;
+        await speakAsync(zhTxt, getZhVoice(), "zh-TW");
+        if (!isLooping) return;
+      }
+    }
     idx++;
     loopTimer = setTimeout(playNext, 500); // 每筆間隔
   };
@@ -687,6 +738,14 @@ function render() {
       main.appendChild(zh);
     }
 
+    if (it.example) {
+      const exBox = document.createElement("div");
+      exBox.className = "item-example";
+      exBox.appendChild(exLine("💬", it.example, it.exampleZh));
+      if (it.reply) exBox.appendChild(exLine("↩️", it.reply, it.replyZh));
+      main.appendChild(exBox);
+    }
+
     const actions = document.createElement("div");
     actions.className = "item-actions";
 
@@ -695,6 +754,7 @@ function render() {
     speakBtn.textContent = "🔊";
     speakBtn.title = "發音";
     speakBtn.onclick = async () => {
+      window.speechSynthesis.cancel(); // 連點不排隊，直接重念
       await speakAsync(it.text, getEnVoice(), "en-US");
       if (it.zh) { await new Promise(r => setTimeout(r, 500)); await speakAsync(it.zh, getZhVoice(), "zh-TW"); }
     };
@@ -782,6 +842,10 @@ function buildExportPayload() {
           zh: it.zh || "",
           sentence: !!it.sentence,
           phonetic: it.phonetic || null,
+          example: it.example || null,
+          exampleZh: it.exampleZh || "",
+          reply: it.reply || null,
+          replyZh: it.replyZh || "",
         })),
     })),
   };
@@ -837,6 +901,58 @@ async function exportData() {
   alert("已匯出備份檔到「下載」資料夾：" + filename);
 }
 
+// ---- 匯入/同步共用：把備份格式（folders→items）合併進現有資料 ----
+// 同名資料夾合併、同字更新翻譯/音標/例句，不動使用者的複習進度
+function mergePayload(payload) {
+  let addedFolders = 0, addedItems = 0, updatedItems = 0;
+  (payload.folders || []).forEach((block) => {
+    if (!block || typeof block.name !== "string" || !block.name.trim()) return;
+    const name = block.name.trim();
+    let target = folders.find((f) => f.name === name);
+    if (!target) {
+      target = { id: genId(), name };
+      folders.push(target);
+      addedFolders++;
+    }
+    checkedFolderIds.add(target.id);
+    (block.items || []).forEach((im) => {
+      if (!im || typeof im.text !== "string" || !im.text.trim()) return;
+      const text = im.text.trim();
+      const existing = items.find((it) => it.folderId === target.id && it.text === text);
+      if (existing) {
+        existing.zh = im.zh || existing.zh;
+        existing.phonetic = im.phonetic || existing.phonetic;
+        existing.sentence = !!im.sentence;
+        if (im.example) { existing.example = im.example; existing.exampleZh = im.exampleZh || ""; }
+        if (im.reply) { existing.reply = im.reply; existing.replyZh = im.replyZh || ""; }
+        updatedItems++;
+      } else {
+        items.push({
+          id: genId(),
+          text,
+          zh: im.zh || "",
+          sentence: !!im.sentence,
+          phonetic: im.phonetic || null,
+          example: im.example || null,
+          exampleZh: im.exampleZh || "",
+          reply: im.reply || null,
+          replyZh: im.replyZh || "",
+          folderId: target.id,
+          box: 0,
+          due: Date.now(),
+        });
+        addedItems++;
+      }
+    });
+  });
+  saveFolders();
+  saveItems();
+  saveCheckedFolderIds();
+  renderAddFolderSelect();
+  render();
+  return "新增 " + addedFolders + " 個資料夾、新增 " + addedItems + " 筆、更新 " + updatedItems + " 筆。";
+}
+
 // ---- 匯入：合併進現有資料夾，不覆蓋使用者自建內容 ----
 function importData(file) {
   const reader = new FileReader();
@@ -852,49 +968,7 @@ function importData(file) {
       alert("這個檔案格式不對，匯入失敗。");
       return;
     }
-    let addedFolders = 0, addedItems = 0, updatedItems = 0;
-    data.folders.forEach((block) => {
-      if (!block || typeof block.name !== "string" || !block.name.trim()) return;
-      const name = block.name.trim();
-      let target = folders.find((f) => f.name === name);
-      if (!target) {
-        target = { id: genId(), name };
-        folders.push(target);
-        addedFolders++;
-      }
-      checkedFolderIds.add(target.id);
-      (block.items || []).forEach((im) => {
-        if (!im || typeof im.text !== "string" || !im.text.trim()) return;
-        const text = im.text.trim();
-        const existing = items.find((it) => it.folderId === target.id && it.text === text);
-        if (existing) {
-          existing.zh = im.zh || existing.zh;
-          existing.phonetic = im.phonetic || existing.phonetic;
-          existing.sentence = !!im.sentence;
-          updatedItems++;
-        } else {
-          items.push({
-            id: genId(),
-            text,
-            zh: im.zh || "",
-            sentence: !!im.sentence,
-            phonetic: im.phonetic || null,
-            folderId: target.id,
-            box: 0,
-            due: Date.now(),
-          });
-          addedItems++;
-        }
-      });
-    });
-    saveFolders();
-    saveItems();
-    saveCheckedFolderIds();
-    renderAddFolderSelect();
-    render();
-    alert(
-      "匯入完成：新增 " + addedFolders + " 個資料夾、新增 " + addedItems + " 筆、更新 " + updatedItems + " 筆。"
-    );
+    alert("匯入完成：" + mergePayload(data));
   };
   reader.readAsText(file);
 }
@@ -947,36 +1021,8 @@ async function syncFromCloud() {
     let payload;
     try { payload = JSON.parse(raw); } catch { alert("雲端資料解析失敗。"); return; }
     if (!payload || !Array.isArray(payload.folders)) { alert("格式不符，請重新匯出上傳。"); return; }
-
-    let addedFolders = 0, addedItems = 0, updatedItems = 0;
-    payload.folders.forEach(block => {
-      if (!block || !block.name) return;
-      const name = block.name.trim();
-      let target = folders.find(f => f.name === name);
-      if (!target) { target = { id: genId(), name }; folders.push(target); addedFolders++; }
-      checkedFolderIds.add(target.id);
-      (block.items || []).forEach(im => {
-        if (!im || !im.text) return;
-        const upsert = (text, zh, sentence, phonetic) => {
-          const existing = items.find(it => it.folderId === target.id && it.text === text);
-          if (existing) {
-            existing.zh = zh || existing.zh;
-            existing.phonetic = phonetic || existing.phonetic;
-            existing.sentence = sentence;
-            updatedItems++;
-          } else {
-            items.push({ id: genId(), text, zh: zh || "", sentence, phonetic: phonetic || null, folderId: target.id, box: 0, due: Date.now() });
-            addedItems++;
-          }
-        };
-        upsert(im.text.trim(), im.zh, !!im.sentence, im.phonetic || null);
-        if (im.example) upsert(im.example.trim(), im.exampleZh || "", true, null);
-        if (im.reply)   upsert(im.reply.trim(),   im.replyZh   || "", true, null);
-      });
-    });
-    saveFolders(); saveItems(); saveCheckedFolderIds();
-    renderAddFolderSelect(); render();
-    alert("網路同步完成：新增 " + addedFolders + " 個資料夾、新增 " + addedItems + " 筆、更新 " + updatedItems + " 筆。");
+    // 例句/回覆句改成跟著單字走（不再拆成獨立句子），由 mergePayload 統一處理
+    alert("網路同步完成：" + mergePayload(payload));
   } catch (e) {
     alert("同步失敗：" + e.message);
   } finally {
@@ -1111,7 +1157,7 @@ function switchTab(name) {
   document.querySelectorAll(".tab-page").forEach((p) =>
     p.classList.toggle("active", p.id === "tab-" + name)
   );
-  if (name === "review") renderReview();
+  if (name === "review") { renderReview(); renderDaily(); }
   // 切到單字本頁時，若正在循環播放，捲到正在念的那一行
   if (name === "book" && playingId) {
     const el = document.querySelector('[data-id="' + playingId + '"]');
@@ -1160,6 +1206,11 @@ function renderReview() {
   // 蓋住中文，等使用者先回想
   $rcZh.textContent = it.zh ? it.zh : "（沒有中文）";
   $rcZh.classList.add("hidden");
+  const $rcExample = document.getElementById("rcExample");
+  $rcExample.innerHTML = "";
+  if (it.example) $rcExample.appendChild(exLine("💬", it.example, it.exampleZh));
+  if (it.reply) $rcExample.appendChild(exLine("↩️", it.reply, it.replyZh));
+  $rcExample.classList.add("hidden");
   $rcActions.classList.add("hidden");
   $rcReveal.classList.remove("hidden");
   $rcProgress.textContent = "還剩 " + queue.length + " 個要複習";
@@ -1167,17 +1218,21 @@ function renderReview() {
 
 function revealAnswer() {
   $rcZh.classList.remove("hidden");
+  document.getElementById("rcExample").classList.remove("hidden");
   $rcReveal.classList.add("hidden");
   $rcActions.classList.remove("hidden");
 }
 
+// 答對升級、答錯歸零（複習頁與聽力測驗共用）
+function applyGrade(it, known) {
+  it.box = known ? Math.min(it.box + 1, SRS_INTERVALS.length - 1) : 0;
+  it.due = nextDue(it.box);
+  saveItems();
+}
+
 function gradeReview(known) {
   const it = items.find((x) => x.id === reviewCurrentId);
-  if (it) {
-    it.box = known ? Math.min(it.box + 1, SRS_INTERVALS.length - 1) : 0;
-    it.due = nextDue(it.box);
-    saveItems();
-  }
+  if (it) applyGrade(it, known);
   renderReview();
 }
 
@@ -1189,7 +1244,254 @@ document.getElementById("rcSpeak").addEventListener("click", () => {
 document.getElementById("rcKnow").addEventListener("click", () => gradeReview(true));
 document.getElementById("rcForgot").addEventListener("click", () => gradeReview(false));
 
+// ---- 每日新字：從內建國小單字包按順序丟新字，學完自動進複習排程 ----
+const DAILY_GOAL_KEY = "daily_goal";
+const DAILY_STATE_KEY = "daily_state_v1"; // { date: "2026-07-03", done: 0 }
+const $learnBtn = document.getElementById("learnBtn");
+const $learnCard = document.getElementById("learnCard");
+let learnCurrent = null;
+
+function dailyGoal() {
+  const n = parseInt(localStorage.getItem(DAILY_GOAL_KEY));
+  return n >= 1 && n <= 50 ? n : 5;
+}
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function dailyState() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(DAILY_STATE_KEY)); } catch {}
+  if (!s || s.date !== todayStr()) s = { date: todayStr(), done: 0 };
+  return s;
+}
+function bumpDailyDone() {
+  const s = dailyState();
+  s.done++;
+  localStorage.setItem(DAILY_STATE_KEY, JSON.stringify(s));
+}
+// 下一個還沒學過的字（單字本裡已有的跳過，換裝置匯入備份也不會重複）
+function nextPackWord() {
+  if (typeof STARTER_PACK === "undefined") return null;
+  const learned = new Set(items.map((it) => it.text.toLowerCase()));
+  for (const lv of STARTER_PACK) {
+    for (const w of lv.words) {
+      if (!learned.has(w.t.toLowerCase())) return { ...w, level: lv.level };
+    }
+  }
+  return null;
+}
+// 新字收進對應等級的資料夾（沒有就自動建）
+function packFolderId(level) {
+  const name = "國小L" + level;
+  let f = folders.find((x) => x.name === name);
+  if (!f) {
+    f = { id: genId(), name };
+    folders.push(f);
+    saveFolders();
+  }
+  checkedFolderIds.add(f.id);
+  saveCheckedFolderIds();
+  return f.id;
+}
+
+function renderDaily() {
+  const s = dailyState();
+  const goal = dailyGoal();
+  document.getElementById("dailyProgress").textContent = s.done + " / " + goal;
+  document.getElementById("dailyGoalInput").value = goal;
+  const next = nextPackWord();
+  $learnBtn.disabled = !next;
+  if (!next) $learnBtn.textContent = "🏆 單字包 300 字全部學完！";
+  else if (s.done >= goal) $learnBtn.textContent = "🎉 今日達成，再多學一個";
+  else $learnBtn.textContent = "🎧 學新字";
+}
+
+// 把目前這張新字卡完整念一遍：單字→中文→例句→例句中文→回覆句→回覆句中文
+async function speakLearnCurrent() {
+  if (!learnCurrent) return;
+  const w = learnCurrent;
+  window.speechSynthesis.cancel();
+  await speakAsync(w.t, getEnVoice(), "en-US");
+  await speakAsync(w.zh, getZhVoice(), "zh-TW");
+  for (const [en, zh] of [[w.ex, w.exZh], [w.re, w.reZh]]) {
+    if (learnCurrent !== w) return; // 已切到下一個字就停
+    await new Promise((r) => setTimeout(r, 250));
+    await speakAsync(en, getEnVoice(), "en-US");
+    if (learnCurrent !== w) return;
+    await new Promise((r) => setTimeout(r, 250));
+    await speakAsync(zh, getZhVoice(), "zh-TW");
+  }
+}
+
+function showLearnCard() {
+  learnCurrent = nextPackWord();
+  renderDaily();
+  if (!learnCurrent) { $learnCard.classList.add("hidden"); return; }
+  const w = learnCurrent;
+  document.getElementById("lcLevel").textContent = "國小 Level " + w.level;
+  document.getElementById("lcText").textContent = w.t;
+  document.getElementById("lcPhonetic").textContent = "/ " + w.ph + " /";
+  document.getElementById("lcZh").textContent = w.zh;
+  const $lcEx = document.getElementById("lcExample");
+  $lcEx.innerHTML = "";
+  $lcEx.appendChild(exLine("💬", w.ex, w.exZh));
+  $lcEx.appendChild(exLine("↩️", w.re, w.reZh));
+  $learnCard.classList.remove("hidden");
+  speakLearnCurrent();
+}
+
+function saveLearnCurrent() {
+  const w = learnCurrent;
+  if (!w) return;
+  items.unshift({
+    id: genId(),
+    text: w.t,
+    zh: w.zh,
+    phonetic: w.ph,
+    sentence: false,
+    example: w.ex,
+    exampleZh: w.exZh,
+    reply: w.re,
+    replyZh: w.reZh,
+    folderId: packFolderId(w.level),
+    box: 0,
+    due: Date.now(),
+  });
+  saveItems();
+  bumpDailyDone();
+  render();
+}
+
+$learnBtn.addEventListener("click", showLearnCard);
+document.getElementById("lcSpeak").addEventListener("click", speakLearnCurrent);
+document.getElementById("lcNext").addEventListener("click", () => {
+  saveLearnCurrent();
+  showLearnCard();
+});
+document.getElementById("lcStop").addEventListener("click", () => {
+  saveLearnCurrent();
+  learnCurrent = null;
+  window.speechSynthesis.cancel();
+  $learnCard.classList.add("hidden");
+  renderDaily();
+  renderReview();
+});
+document.getElementById("dailyGoalInput").addEventListener("change", (e) => {
+  const n = parseInt(e.target.value);
+  if (n >= 1 && n <= 50) localStorage.setItem(DAILY_GOAL_KEY, n);
+  renderDaily();
+});
+
+// ---- 聽力測驗：念英文選中文，答完把例句對話念一遍補強 ----
+let quizCurrent = null;
+let quizScore = { right: 0, total: 0 };
+
+function quizPool() {
+  const due = dueItems().filter((it) => it.zh);
+  return due.length ? due : items.filter((it) => it.zh);
+}
+function allZhChoices() {
+  const set = new Set(items.map((it) => it.zh).filter(Boolean));
+  if (typeof STARTER_PACK !== "undefined")
+    STARTER_PACK.forEach((l) => l.words.forEach((w) => set.add(w.zh)));
+  return [...set];
+}
+function startQuiz() {
+  if (!quizPool().length) {
+    alert("單字本還沒有可以測驗的內容，先按「🎧 學新字」學幾個吧！");
+    return;
+  }
+  quizScore = { right: 0, total: 0 };
+  $reviewCard.classList.add("hidden");
+  $reviewEmpty.classList.add("hidden");
+  $learnCard.classList.add("hidden");
+  document.getElementById("quizCard").classList.remove("hidden");
+  nextQuizQuestion();
+}
+function nextQuizQuestion() {
+  const pool = quizPool();
+  if (!pool.length) { stopQuiz(); return; }
+  let it = pool[Math.floor(Math.random() * pool.length)];
+  while (quizCurrent && pool.length > 1 && it.id === quizCurrent.id) {
+    it = pool[Math.floor(Math.random() * pool.length)];
+  }
+  quizCurrent = it;
+  // 選項：正解＋3 個從單字本/單字包抽的干擾
+  const others = allZhChoices().filter((z) => z !== it.zh);
+  const opts = [it.zh];
+  while (opts.length < 4 && others.length) {
+    opts.push(others.splice(Math.floor(Math.random() * others.length), 1)[0]);
+  }
+  opts.sort(() => Math.random() - 0.5);
+  const $opts = document.getElementById("quizOptions");
+  $opts.innerHTML = "";
+  opts.forEach((zh) => {
+    const b = document.createElement("button");
+    b.className = "quiz-opt";
+    b.textContent = zh;
+    b.onclick = () => answerQuiz(b, zh);
+    $opts.appendChild(b);
+  });
+  const $fb = document.getElementById("quizFeedback");
+  $fb.textContent = "";
+  $fb.className = "quiz-feedback";
+  document.getElementById("quizNext").classList.add("hidden");
+  updateQuizScore();
+  window.speechSynthesis.cancel();
+  speakAsync(it.text, getEnVoice(), "en-US");
+}
+async function answerQuiz(btn, zh) {
+  if (!quizCurrent) return;
+  const it = quizCurrent;
+  const right = zh === it.zh;
+  quizScore.total++;
+  if (right) quizScore.right++;
+  document.querySelectorAll(".quiz-opt").forEach((b) => {
+    b.disabled = true;
+    if (b.textContent === it.zh) b.classList.add("correct");
+  });
+  if (!right) btn.classList.add("wrong");
+  const $fb = document.getElementById("quizFeedback");
+  $fb.textContent = right ? "✅ 答對了！" : "❌ 正確答案：" + it.zh;
+  $fb.className = "quiz-feedback " + (right ? "ok" : "err");
+  applyGrade(it, right); // 接回間隔重複：答對拉長、答錯歸零
+  updateDueBadge();
+  updateQuizScore();
+  document.getElementById("quizNext").classList.remove("hidden");
+  // 補強：例句對話念一遍
+  if (it.example) {
+    await speakAsync(it.example, getEnVoice(), "en-US");
+    if (quizCurrent !== it) return;
+    if (it.exampleZh) await speakAsync(it.exampleZh, getZhVoice(), "zh-TW");
+    if (quizCurrent !== it || !it.reply) return;
+    await speakAsync(it.reply, getEnVoice(), "en-US");
+    if (quizCurrent !== it) return;
+    if (it.replyZh) await speakAsync(it.replyZh, getZhVoice(), "zh-TW");
+  }
+}
+function updateQuizScore() {
+  document.getElementById("quizScore").textContent =
+    quizScore.total ? "答對 " + quizScore.right + " / " + quizScore.total : "";
+}
+function stopQuiz() {
+  quizCurrent = null;
+  window.speechSynthesis.cancel();
+  document.getElementById("quizCard").classList.add("hidden");
+  renderReview();
+}
+
+document.getElementById("quizBtn").addEventListener("click", startQuiz);
+document.getElementById("quizSpeak").addEventListener("click", () => {
+  if (!quizCurrent) return;
+  window.speechSynthesis.cancel();
+  speakAsync(quizCurrent.text, getEnVoice(), "en-US");
+});
+document.getElementById("quizNext").addEventListener("click", nextQuizQuestion);
+document.getElementById("quizStop").addEventListener("click", stopQuiz);
+
 render();
+renderDaily();
 
 // 開啟時背景補齊舊資料中查無音標的單字（沒網路會自動略過）
 backfillPhonetics();
@@ -1284,7 +1586,12 @@ function initFirebase() {
       } else { return; }
 
       if (items.some(it => it.folderId === folder.id && it.text === text)) return;
-      items.unshift({ id: genId(), text, zh, phonetic, sentence, folderId: folder.id, box: 0, due: Date.now() });
+      items.unshift({
+        id: genId(), text, zh, phonetic, sentence,
+        example: entry.example || null, exampleZh: entry.exampleZh || "",
+        reply: entry.reply || null, replyZh: entry.replyZh || "",
+        folderId: folder.id, box: 0, due: Date.now(),
+      });
       saveItems();
       saveFolders();
       saveCheckedFolderIds();

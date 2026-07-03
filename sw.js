@@ -1,10 +1,11 @@
 // Service Worker — 讓 App 離線也能打開
-const CACHE = "vocab-app-v1.7.20";
+const CACHE = "vocab-app-v1.8.0";
 const ASSETS = [
   "./",
   "index.html",
   "style.css",
   "dict.js",
+  "starter-pack.js",
   "app.js",
   "manifest.json",
   "icon-192.png",
@@ -30,6 +31,7 @@ self.addEventListener("fetch", (e) => {
       return fetch(e.request).catch(() => {
         // 離線且快取沒命中：導覽請求一律回退到已快取的 index.html
         if (e.request.mode === "navigate") return caches.match("index.html");
+        return Response.error(); // 其他請求回網路錯誤，不噴 undefined TypeError
       });
     })
   );

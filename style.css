@@ -300,3 +300,43 @@ body {
 .lock-text { font-size: 1rem; color: #cbd5e1; }
 .lock-current { font-size: 1.5rem; font-weight: 700; min-height: 1.6em; word-break: break-word; }
 .lock-unlock { margin-top: 20px; padding: 16px 28px; }
+
+/* ---- 每日新字 ---- */
+.daily-box {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+}
+.daily-head { flex: 1 1 100%; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.daily-head .tab-count { background: var(--blue); color: #fff; }
+.daily-goal { margin-left: auto; font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.daily-goal input {
+  width: 52px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.9rem; text-align: center; font-family: inherit;
+}
+.daily-box .tool-btn { flex: 1; }
+.lc-level { font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+.lc-zh { font-size: 1.2rem; font-weight: 700; margin: 8px 0; }
+
+/* ---- 例句（清單、學新字卡、複習卡共用）---- */
+.item-example { margin-top: 6px; border-left: 3px solid var(--border); padding-left: 8px; }
+.rc-example { margin: 10px 0; text-align: left; border-left: 3px solid var(--border); padding-left: 10px; }
+.ex-line { margin: 6px 0; }
+.ex-en { font-size: 0.95rem; cursor: pointer; }
+.ex-en:active { opacity: 0.6; }
+.ex-ph { font-size: 0.78rem; color: var(--muted); font-family: "Segoe UI", Arial, sans-serif; }
+.ex-zh { font-size: 0.85rem; color: var(--muted); }
+
+/* ---- 聽力測驗 ---- */
+.quiz-q { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+.quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.quiz-opt {
+  border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+  padding: 14px 10px; font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+.quiz-opt:disabled { opacity: 0.7; }
+.quiz-opt.correct { background: #dcfce7; border-color: #16a34a; color: #166534; opacity: 1; }
+.quiz-opt.wrong { background: #fee2e2; border-color: var(--danger); color: #991b1b; opacity: 1; }
+.quiz-feedback { min-height: 1.2em; font-weight: 700; margin: 6px 0; }
+.quiz-feedback.ok { color: #16a34a; }
+.quiz-feedback.err { color: var(--danger); }

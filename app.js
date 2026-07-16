@@ -157,6 +157,43 @@ function purgeOrphanItems() {
   if (items.length !== before) saveItems();
 }
 
+// ---- 學習統計：每天學了幾個新字、複習了幾題，算連續天數與分類熟練度 ----
+const STATS_LOG_KEY = "stats_log_v1"; // { "2026-07-17": { learned: 3, reviewed: 12 } }
+function loadStatsLog() {
+  try { return JSON.parse(localStorage.getItem(STATS_LOG_KEY)) || {}; } catch { return {}; }
+}
+let statsLog = loadStatsLog();
+function bumpStat(kind) {
+  const d = todayStr();
+  if (!statsLog[d]) statsLog[d] = { learned: 0, reviewed: 0 };
+  statsLog[d][kind] = (statsLog[d][kind] || 0) + 1;
+  localStorage.setItem(STATS_LOG_KEY, JSON.stringify(statsLog));
+}
+// 連續學習天數：從今天（沒活動就從昨天）往回數，每天有任一活動就算
+function streakDays() {
+  const day = new Date();
+  const key = (d) =>
+    d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const active = (d) => { const s = statsLog[key(d)]; return s && (s.learned || s.reviewed); };
+  let n = 0;
+  if (!active(day)) day.setDate(day.getDate() - 1);
+  while (active(day)) { n++; day.setDate(day.getDate() - 1); }
+  return n;
+}
+
+// ---- 錯字本：答錯進清單、答對移出，可只針對錯字加強 ----
+const WRONG_IDS_KEY = "wrong_ids_v1";
+function loadWrongIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(WRONG_IDS_KEY)) || []); } catch { return new Set(); }
+}
+const wrongIds = loadWrongIds();
+function saveWrongIds() {
+  localStorage.setItem(WRONG_IDS_KEY, JSON.stringify([...wrongIds]));
+}
+function wrongItems() {
+  return items.filter((it) => wrongIds.has(it.id) && checkedFolderIds.has(it.folderId) && it.zh);
+}
+
 // ---- 判斷是單字還是句子 ----
 function isSentence(text) {
   return text.trim().split(/\s+/).length > 1;
@@ -1322,11 +1359,16 @@ function revealAnswer() {
   $rcActions.classList.remove("hidden");
 }
 
-// 答對升級、答錯歸零（複習頁與聽力測驗共用）
+// 答對升級、答錯歸零（複習頁與所有測驗模式共用）；順便維護錯字本與統計
 function applyGrade(it, known) {
   it.box = known ? Math.min(it.box + 1, SRS_INTERVALS.length - 1) : 0;
   it.due = nextDue(it.box);
+  if (known) wrongIds.delete(it.id);
+  else wrongIds.add(it.id);
+  saveWrongIds();
+  bumpStat("reviewed");
   saveItems();
+  renderStats();
 }
 
 function gradeReview(known) {
@@ -1368,6 +1410,8 @@ function bumpDailyDone() {
   const s = dailyState();
   s.done++;
   localStorage.setItem(DAILY_STATE_KEY, JSON.stringify(s));
+  bumpStat("learned");
+  renderStats();
 }
 // 學習來源：四個內建單字包擇一（記住上次選的）
 const LEARN_PACK_KEY = "learn_pack";
@@ -1429,6 +1473,71 @@ function renderDaily() {
   if (!next) $learnBtn.textContent = "🏆 " + pack.label + "單字包 " + total + " 字全部學完！";
   else if (s.done >= goal) $learnBtn.textContent = "🎉 今日達成，再多學一個";
   else $learnBtn.textContent = "🎧 學新字";
+  const $wrongBtn = document.getElementById("wrongBtn");
+  if ($wrongBtn) {
+    const n = wrongItems().length;
+    $wrongBtn.textContent = "🔥 錯字加強（" + n + "）";
+    $wrongBtn.disabled = !n;
+  }
+  renderStats();
+}
+
+// ---- 統計面板：連續天數、今日活動、到期預告、五大分類熟練度 ----
+function renderStats() {
+  const $streak = document.getElementById("statStreak");
+  const $body = document.getElementById("statsBody");
+  if (!$streak || !$body) return;
+  $streak.textContent = "🔥 連續 " + streakDays() + " 天";
+  const t = statsLog[todayStr()] || { learned: 0, reviewed: 0 };
+  // 到期預告：只看目前勾選的資料夾（跟出題範圍一致）
+  const now = Date.now();
+  const endTomorrow = new Date();
+  endTomorrow.setHours(23, 59, 59, 999);
+  endTomorrow.setDate(endTomorrow.getDate() + 1);
+  const pool = items.filter((it) => checkedFolderIds.has(it.folderId));
+  const dueTomorrow = pool.filter((it) => it.due > now && it.due <= endTomorrow.getTime()).length;
+  const dueWeek = pool.filter((it) => it.due > now && it.due <= now + 7 * SRS_DAY).length;
+  $body.innerHTML = "";
+  const row = (label, value) => {
+    const div = document.createElement("div");
+    div.className = "stat-row";
+    const l = document.createElement("span");
+    l.textContent = label;
+    const v = document.createElement("b");
+    v.textContent = value;
+    div.append(l, v);
+    $body.appendChild(div);
+  };
+  row("今日已學新字", t.learned + " 字");
+  row("今日已複習/測驗", t.reviewed + " 題");
+  row("明天前到期", dueTomorrow + " 字");
+  row("一週內到期", dueWeek + " 字");
+  row("錯字本", wrongItems().length + " 字");
+  // 各分類熟練度：分類內所有字的 box 平均 ÷ 最高級
+  CATEGORIES.forEach((cat) => {
+    const catIds = new Set(folders.filter((f) => (f.cat || "日常生活常用") === cat).map((f) => f.id));
+    const list = items.filter((it) => catIds.has(it.folderId));
+    if (!list.length) return;
+    const pct = Math.round(
+      (list.reduce((n, it) => n + (it.box || 0), 0) / (list.length * (SRS_INTERVALS.length - 1))) * 100
+    );
+    const m = document.createElement("div");
+    m.className = "m-row";
+    const name = document.createElement("span");
+    name.className = "m-name";
+    name.textContent = cat + "（" + list.length + "字）";
+    const bar = document.createElement("div");
+    bar.className = "m-bar";
+    const fill = document.createElement("div");
+    fill.className = "m-fill";
+    fill.style.width = pct + "%";
+    bar.appendChild(fill);
+    const p = document.createElement("span");
+    p.className = "m-pct";
+    p.textContent = pct + "%";
+    m.append(name, bar, p);
+    $body.appendChild(m);
+  });
 }
 
 // 把目前這張新字卡完整念一遍：單字→中文→例句→例句中文→回覆句→回覆句中文
@@ -1514,30 +1623,45 @@ document.getElementById("packSelect").addEventListener("change", (e) => {
   renderDaily();
 });
 
-// ---- 聽力測驗：念英文選中文，答完把例句對話念一遍補強 ----
+// ---- 測驗共用：把所有卡片收起來（各模式開場用）----
+function hideAllCards() {
+  ["reviewCard", "reviewEmpty", "learnCard", "quizCard", "clozeCard", "spellCard"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("hidden");
+  });
+}
+
+// ---- 聽力測驗（聽英選中）＋反向測驗（看中選英）＋錯字加強 ----
 let quizCurrent = null;
 let quizScore = { right: 0, total: 0 };
+let quizMode = "listen"; // listen＝念英文選中文；reverse＝看中文選英文
+let quizWrongOnly = false; // true＝只從錯字本出題
 
 function quizPool() {
   // 出題只從目前勾選的資料夾抽（dueItems 已過濾，後備清單也要過濾）
-  const due = dueItems().filter((it) => it.zh);
-  return due.length ? due : items.filter((it) => it.zh && checkedFolderIds.has(it.folderId));
+  const ok = (it) => it.zh && (quizMode === "listen" || !it.sentence); // 反向選項是單字，句子不出
+  if (quizWrongOnly) return wrongItems().filter(ok);
+  const due = dueItems().filter(ok);
+  return due.length ? due : items.filter((it) => ok(it) && checkedFolderIds.has(it.folderId));
 }
 function allZhChoices() {
   const set = new Set(items.map((it) => it.zh).filter(Boolean));
   PACKS.forEach((p) => p.data.forEach((l) => l.words.forEach((w) => set.add(w.zh))));
   return [...set];
 }
-function startQuiz() {
+function startQuiz(mode, wrongOnly) {
+  quizMode = mode === "reverse" ? "reverse" : "listen";
+  quizWrongOnly = !!wrongOnly;
   if (!quizPool().length) {
-    alert("單字本還沒有可以測驗的內容，先按「🎧 學新字」學幾個吧！");
+    alert(
+      quizWrongOnly
+        ? "錯字本目前是空的，太棒了！測驗答錯的字才會進來。"
+        : "單字本還沒有可以測驗的內容，先按「🎧 學新字」學幾個吧！"
+    );
     return;
   }
   quizScore = { right: 0, total: 0 };
-  $reviewCard.classList.add("hidden");
-  $reviewEmpty.classList.add("hidden");
-  $learnCard.classList.add("hidden");
-  document.getElementById("clozeCard").classList.add("hidden");
+  hideAllCards();
   document.getElementById("quizCard").classList.remove("hidden");
   nextQuizQuestion();
 }
@@ -1549,48 +1673,80 @@ function nextQuizQuestion() {
     it = pool[Math.floor(Math.random() * pool.length)];
   }
   quizCurrent = it;
-  // 選項：正解＋3 個從單字本/單字包抽的干擾
-  const others = allZhChoices().filter((z) => z !== it.zh);
-  const opts = [it.zh];
-  while (opts.length < 4 && others.length) {
-    opts.push(others.splice(Math.floor(Math.random() * others.length), 1)[0]);
-  }
-  opts.sort(() => Math.random() - 0.5);
+  const $q = document.getElementById("quizQuestion");
+  document.getElementById("quizSpeak").classList.toggle("hidden", quizMode === "reverse");
   const $opts = document.getElementById("quizOptions");
   $opts.innerHTML = "";
-  opts.forEach((zh) => {
-    const b = document.createElement("button");
-    b.className = "quiz-opt";
-    b.textContent = zh;
-    b.onclick = () => answerQuiz(b, zh);
-    $opts.appendChild(b);
-  });
+  if (quizMode === "reverse") {
+    $q.textContent = "🔁 「" + it.zh + "」的英文是哪一個？";
+    // 選項：正解＋3 個相近英文字（沿用填空的相似度挑選），附音標
+    clozeChoices(it).forEach((o) => {
+      const b = document.createElement("button");
+      b.className = "quiz-opt cloze-opt";
+      b.dataset.val = o.t;
+      const w = document.createElement("div");
+      w.className = "opt-word";
+      w.textContent = o.t;
+      const p = document.createElement("div");
+      p.className = "opt-ph";
+      p.textContent = phDisplay(o.ph);
+      b.append(w, p);
+      b.onclick = () => answerQuiz(b, o.t);
+      $opts.appendChild(b);
+    });
+  } else {
+    $q.textContent = "👂 聽聽看，這個字是什麼意思？";
+    // 選項：正解＋3 個從單字本/單字包抽的干擾
+    const others = allZhChoices().filter((z) => z !== it.zh);
+    const opts = [it.zh];
+    while (opts.length < 4 && others.length) {
+      opts.push(others.splice(Math.floor(Math.random() * others.length), 1)[0]);
+    }
+    opts.sort(() => Math.random() - 0.5);
+    opts.forEach((zh) => {
+      const b = document.createElement("button");
+      b.className = "quiz-opt";
+      b.dataset.val = zh;
+      b.textContent = zh;
+      b.onclick = () => answerQuiz(b, zh);
+      $opts.appendChild(b);
+    });
+  }
   const $fb = document.getElementById("quizFeedback");
   $fb.textContent = "";
   $fb.className = "quiz-feedback";
   document.getElementById("quizNext").classList.add("hidden");
   updateQuizScore();
   window.speechSynthesis.cancel();
-  speakAsync(it.text, getEnVoice(), "en-US");
+  if (quizMode === "listen") speakAsync(it.text, getEnVoice(), "en-US");
 }
-async function answerQuiz(btn, zh) {
+async function answerQuiz(btn, val) {
   if (!quizCurrent) return;
   const it = quizCurrent;
-  const right = zh === it.zh;
+  const answerKey = quizMode === "reverse" ? it.text : it.zh;
+  const right =
+    quizMode === "reverse" ? val.toLowerCase() === it.text.toLowerCase() : val === it.zh;
   quizScore.total++;
   if (right) quizScore.right++;
-  document.querySelectorAll(".quiz-opt").forEach((b) => {
+  document.querySelectorAll("#quizOptions .quiz-opt").forEach((b) => {
     b.disabled = true;
-    if (b.textContent === it.zh) b.classList.add("correct");
+    if ((b.dataset.val || "").toLowerCase() === answerKey.toLowerCase()) b.classList.add("correct");
   });
   if (!right) btn.classList.add("wrong");
   const $fb = document.getElementById("quizFeedback");
-  $fb.textContent = right ? "✅ 答對了！" : "❌ 正確答案：" + it.zh;
+  $fb.textContent = right ? "✅ 答對了！" : "❌ 正確答案：" + answerKey;
   $fb.className = "quiz-feedback " + (right ? "ok" : "err");
   applyGrade(it, right); // 接回間隔重複：答對拉長、答錯歸零
   updateDueBadge();
   updateQuizScore();
+  renderDaily(); // 錯字數可能變了
   document.getElementById("quizNext").classList.remove("hidden");
+  window.speechSynthesis.cancel();
+  // 反向模式：先把正解單字念一遍
+  if (quizMode === "reverse") {
+    await speakAsync(it.text, getEnVoice(), "en-US");
+    if (quizCurrent !== it) return;
+  }
   // 補強：例句對話念一遍
   if (it.example) {
     await speakAsync(it.example, getEnVoice(), "en-US");
@@ -1667,10 +1823,7 @@ function startCloze() {
     return;
   }
   clozeScore = { right: 0, total: 0 };
-  $reviewCard.classList.add("hidden");
-  $reviewEmpty.classList.add("hidden");
-  $learnCard.classList.add("hidden");
-  document.getElementById("quizCard").classList.add("hidden");
+  hideAllCards();
   document.getElementById("clozeCard").classList.remove("hidden");
   nextClozeQuestion();
 }
@@ -1758,11 +1911,117 @@ function stopCloze() {
   renderReview();
 }
 
+// ---- 拼字測驗：念單字＋看中文，把字拼出來，逐字母比對 ----
+let spellCurrent = null;
+let spellScore = { right: 0, total: 0 };
+
+function spellPool() {
+  const ok = (it) => !it.sentence && it.zh;
+  const due = dueItems().filter(ok);
+  return due.length ? due : items.filter((it) => ok(it) && checkedFolderIds.has(it.folderId));
+}
+function startSpell() {
+  if (!spellPool().length) {
+    alert("單字本還沒有可以拼字的單字，先按「🎧 學新字」學幾個吧！");
+    return;
+  }
+  spellScore = { right: 0, total: 0 };
+  hideAllCards();
+  document.getElementById("spellCard").classList.remove("hidden");
+  nextSpellQuestion();
+}
+function nextSpellQuestion() {
+  const pool = spellPool();
+  if (!pool.length) { stopSpell(); return; }
+  let it = pool[Math.floor(Math.random() * pool.length)];
+  while (spellCurrent && pool.length > 1 && it.id === spellCurrent.id) {
+    it = pool[Math.floor(Math.random() * pool.length)];
+  }
+  spellCurrent = it;
+  document.getElementById("spellZh").textContent = it.zh;
+  const $in = document.getElementById("spellInput");
+  $in.value = "";
+  $in.disabled = false;
+  document.getElementById("spellDiff").innerHTML = "";
+  const $fb = document.getElementById("spellFeedback");
+  $fb.textContent = "";
+  $fb.className = "quiz-feedback";
+  document.getElementById("spellSubmit").classList.remove("hidden");
+  document.getElementById("spellNext").classList.add("hidden");
+  updateSpellScore();
+  window.speechSynthesis.cancel();
+  speakAsync(it.text, getEnVoice(), "en-US");
+  $in.focus();
+}
+async function answerSpell() {
+  if (!spellCurrent) return;
+  const it = spellCurrent;
+  const guess = document.getElementById("spellInput").value.trim();
+  if (!guess) return;
+  const target = it.text;
+  const right = guess.toLowerCase() === target.toLowerCase();
+  spellScore.total++;
+  if (right) spellScore.right++;
+  document.getElementById("spellInput").disabled = true;
+  // 逐字母比對：對的綠、錯的紅劃掉，下面給正解
+  const $diff = document.getElementById("spellDiff");
+  $diff.innerHTML = "";
+  const g = guess.toLowerCase(), t = target.toLowerCase();
+  for (let i = 0; i < Math.max(g.length, t.length); i++) {
+    const s = document.createElement("span");
+    s.className = g[i] === t[i] ? "ok" : "bad";
+    s.textContent = guess[i] || "＿";
+    $diff.appendChild(s);
+  }
+  if (!right) {
+    const ans = document.createElement("div");
+    ans.className = "spell-answer";
+    ans.textContent = "正解：" + target;
+    $diff.appendChild(ans);
+  }
+  const $fb = document.getElementById("spellFeedback");
+  $fb.textContent = right ? "✅ 拼對了！" : "❌ 再看一眼正確拼法";
+  $fb.className = "quiz-feedback " + (right ? "ok" : "err");
+  applyGrade(it, right); // 接回間隔重複：答對拉長、答錯歸零
+  updateDueBadge();
+  updateSpellScore();
+  renderDaily();
+  document.getElementById("spellSubmit").classList.add("hidden");
+  document.getElementById("spellNext").classList.remove("hidden");
+  window.speechSynthesis.cancel();
+  await speakAsync(target, getEnVoice(), "en-US");
+}
+function updateSpellScore() {
+  document.getElementById("spellScore").textContent =
+    spellScore.total ? "答對 " + spellScore.right + " / " + spellScore.total : "";
+}
+function stopSpell() {
+  spellCurrent = null;
+  window.speechSynthesis.cancel();
+  document.getElementById("spellCard").classList.add("hidden");
+  renderReview();
+}
+
+document.getElementById("spellBtn").addEventListener("click", startSpell);
+document.getElementById("spellSpeak").addEventListener("click", () => {
+  if (!spellCurrent) return;
+  window.speechSynthesis.cancel();
+  speakAsync(spellCurrent.text, getEnVoice(), "en-US");
+});
+document.getElementById("spellSubmit").addEventListener("click", answerSpell);
+document.getElementById("spellInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); answerSpell(); }
+});
+document.getElementById("spellNext").addEventListener("click", nextSpellQuestion);
+document.getElementById("spellStop").addEventListener("click", stopSpell);
+
 document.getElementById("clozeBtn").addEventListener("click", startCloze);
 document.getElementById("clozeNext").addEventListener("click", nextClozeQuestion);
 document.getElementById("clozeStop").addEventListener("click", stopCloze);
 
-document.getElementById("quizBtn").addEventListener("click", startQuiz);
+document.getElementById("quizBtn").addEventListener("click", () => startQuiz("listen", false));
+document.getElementById("reverseBtn").addEventListener("click", () => startQuiz("reverse", false));
+document.getElementById("wrongBtn").addEventListener("click", () => startQuiz("listen", true));
 document.getElementById("quizSpeak").addEventListener("click", () => {
   if (!quizCurrent) return;
   window.speechSynthesis.cancel();
@@ -1773,6 +2032,54 @@ document.getElementById("quizStop").addEventListener("click", stopQuiz);
 
 render();
 renderDaily();
+
+// ---- 每日提醒：到了設定時間、今日新字還沒達標就發通知 ----
+// ponytail: 本機通知，App（含 PWA/TWA）開著或在背景才會響；真正關掉也能推播需要伺服器，先不做
+const REMIND_ON_KEY = "remind_on";
+const REMIND_TIME_KEY = "remind_time";
+const REMIND_LAST_KEY = "remind_last"; // 今天提醒過就不再吵
+const $remindOn = document.getElementById("remindOn");
+const $remindTime = document.getElementById("remindTime");
+
+async function checkReminder() {
+  if (localStorage.getItem(REMIND_ON_KEY) !== "1") return;
+  if (localStorage.getItem(REMIND_LAST_KEY) === todayStr()) return;
+  const t = localStorage.getItem(REMIND_TIME_KEY) || "20:00";
+  const now = new Date();
+  const cur = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+  if (cur < t) return;
+  if (dailyState().done >= dailyGoal()) return;
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  localStorage.setItem(REMIND_LAST_KEY, todayStr());
+  const body = "今天的新字還沒學完（" + dailyState().done + " / " + dailyGoal() + "），來聽幾個吧！";
+  try {
+    // Android 一定要走 Service Worker 發，桌機退回一般 Notification
+    const reg = navigator.serviceWorker && (await navigator.serviceWorker.getRegistration());
+    if (reg && reg.showNotification) reg.showNotification("英文聽中學", { body, icon: "icon-192.png" });
+    else new Notification("英文聽中學", { body, icon: "icon-192.png" });
+  } catch { /* 不支援通知就算了 */ }
+}
+if ($remindOn && $remindTime) {
+  $remindOn.checked = localStorage.getItem(REMIND_ON_KEY) === "1";
+  $remindTime.value = localStorage.getItem(REMIND_TIME_KEY) || "20:00";
+  $remindOn.addEventListener("change", async () => {
+    if ($remindOn.checked && "Notification" in window && Notification.permission !== "granted") {
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        $remindOn.checked = false;
+        alert("沒有拿到通知權限，無法提醒；請到系統設定開啟通知後再試。");
+        return;
+      }
+    }
+    localStorage.setItem(REMIND_ON_KEY, $remindOn.checked ? "1" : "0");
+  });
+  $remindTime.addEventListener("change", () => {
+    localStorage.setItem(REMIND_TIME_KEY, $remindTime.value || "20:00");
+    localStorage.removeItem(REMIND_LAST_KEY); // 改時間後今天可以再提醒一次
+  });
+  setInterval(checkReminder, 60 * 1000);
+  checkReminder();
+}
 
 // 開啟時背景補齊舊資料中查無音標的單字（沒網路會自動略過）
 backfillPhonetics();
@@ -1893,4 +2200,22 @@ function showToast(msg) {
   setTimeout(() => t.remove(), 3000);
 }
 
-initFirebase();
+// ---- Firebase SDK 延遲載入：首屏先畫完，再抓 CDN、啟動同步；離線/CDN 掛掉不影響 App ----
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+(async () => {
+  try {
+    const base = "https://www.gstatic.com/firebasejs/10.14.1/";
+    await loadScript(base + "firebase-app-compat.js");
+    await loadScript(base + "firebase-auth-compat.js");
+    await loadScript(base + "firebase-firestore-compat.js");
+    initFirebase();
+  } catch { /* 沒網路：雲端同步這次先停用，其餘功能照常 */ }
+})();

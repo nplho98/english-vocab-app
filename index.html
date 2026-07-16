@@ -49,6 +49,17 @@
       <button id="addToBookBtn" class="btn-loop tool-btn hidden">➕ 加入單字本</button>
     </section>
 
+    <details class="help" id="remindSettings">
+      <summary>⏰ 每日提醒</summary>
+      <label class="voice-row">提醒時間
+        <input type="time" id="remindTime" value="20:00" />
+      </label>
+      <label class="voice-row">
+        <input type="checkbox" id="remindOn" />
+        開啟提醒（到時間還沒學完今日新字就通知我；App 要開著或在背景才會響）
+      </label>
+    </details>
+
     <details class="help" id="voiceSettings">
       <summary>🔊 語音設定（選喜歡的聲音）</summary>
       <label class="voice-row">英文發音
@@ -87,6 +98,12 @@
         <li><b>✍️ 例句填空</b>：把單字的例句挖空（不給提示），從四個「長得很像」的選項挑正確的字；每個選項都附音節音標和 🔊 播放。答對答錯一樣連動複習排程，答完念完整例句對話。</li>
         <li><b>音節音標</b>：所有單字音標都以「·」標出音節分界（例：/ bə·ˈnæ·nə /），跟著一節一節念更好記。</li>
         <li><b>例句</b>：單字下方的 💬 例句和 ↩️ 回覆句都可以點一下發音，下面附整句音標。</li>
+        <li><b>🔁 中翻英</b>：反過來考——看中文，從四個「長得很像」的英文字（附音標）挑正確的，練「想得出來」而不只「認得出來」。</li>
+        <li><b>🔤 拼字測驗</b>：App 念單字＋顯示中文，把字拼出來按 Enter；逐字母比對，對的綠色、錯的紅色，錯了會顯示正確拼法。</li>
+        <li><b>🔥 錯字加強</b>：任何測驗答錯的字自動收進錯字本（按鈕上會顯示幾個字），按下去只針對這些字加強；答對就從錯字本移出。</li>
+        <li><b>📊 學習統計</b>：複習分頁的統計面板顯示連續學習天數、今日已學/已複習、明天與一週內到期字數、五大分類熟練度。</li>
+        <li><b>⏰ 每日提醒</b>：在查詢分頁設定提醒時間並開啟，到時間還沒學完今日新字就跳通知（App 要開著或在背景）。</li>
+        <li><b>🌙 深色模式</b>：跟著手機系統的深色模式自動切換，不用設定。</li>
         <li><b>📅 複習分頁</b>：用「間隔重複法」幫你記單字。每天只丟出<b>到期該複習</b>的單字，一次一張卡，先回想再按「👀 看中文意思」。</li>
         <li>複習時按 <b>✅ 記得</b> 會把下次間隔拉長（1天→2天→4天→7天→14天）；按 <b>❌ 忘了</b> 則歸零、10 分鐘後再出現。記熟的字會慢慢淡出，模糊的字一直回來找你。</li>
         <li>分頁鈕上的數字：「📅 複習」顯示今天到期幾個、「📚 單字本」顯示總筆數。</li>
@@ -98,7 +115,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.9.0</li>
+        <li><b class="dev-k">版本</b>：v1.10.0</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
@@ -116,7 +133,15 @@
       <button id="learnBtn" class="btn-primary tool-btn">🎧 學新字</button>
       <button id="quizBtn" class="btn-loop tool-btn">🎧 聽力測驗</button>
       <button id="clozeBtn" class="btn-loop tool-btn">✍️ 例句填空</button>
+      <button id="reverseBtn" class="btn-loop tool-btn">🔁 中翻英</button>
+      <button id="spellBtn" class="btn-loop tool-btn">🔤 拼字測驗</button>
+      <button id="wrongBtn" class="btn-loop tool-btn">🔥 錯字加強（0）</button>
     </section>
+
+    <details class="help stats-box">
+      <summary>📊 學習統計 <span id="statStreak" class="tab-count">🔥 連續 0 天</span></summary>
+      <div id="statsBody"></div>
+    </details>
 
     <div id="learnCard" class="review-card hidden">
       <div id="lcLevel" class="lc-level"></div>
@@ -145,8 +170,23 @@
       <div id="clozeScore" class="count"></div>
     </div>
 
+    <div id="spellCard" class="review-card hidden">
+      <div class="quiz-q">🔤 聽聽看，把這個字拼出來</div>
+      <button id="spellSpeak" class="btn-loop">🔊 再聽一次</button>
+      <div id="spellZh" class="lc-zh"></div>
+      <input id="spellInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="輸入拼字後按 Enter" />
+      <div id="spellDiff" class="spell-diff"></div>
+      <div id="spellFeedback" class="quiz-feedback"></div>
+      <button id="spellSubmit" class="btn-primary rc-full">✔️ 檢查</button>
+      <div class="rc-actions">
+        <button id="spellStop" class="btn-del-sel">⏹️ 結束拼字</button>
+        <button id="spellNext" class="btn-loop rc-know hidden">下一題 ➡️</button>
+      </div>
+      <div id="spellScore" class="count"></div>
+    </div>
+
     <div id="quizCard" class="review-card hidden">
-      <div class="quiz-q">👂 聽聽看，這個字是什麼意思？</div>
+      <div class="quiz-q" id="quizQuestion">👂 聽聽看，這個字是什麼意思？</div>
       <button id="quizSpeak" class="btn-loop">🔊 再聽一次</button>
       <div id="quizOptions" class="quiz-options"></div>
       <div id="quizFeedback" class="quiz-feedback"></div>
@@ -209,9 +249,7 @@
     <button id="unlockBtn" class="btn-primary lock-unlock">⏹️ 解鎖並停止播放</button>
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <!-- Firebase SDK 改由 app.js 首屏渲染後動態載入，CDN 慢或離線都不卡開場 -->
   <script src="dict.js"></script>
   <script src="starter-pack.js"></script>
   <script src="pack-jhs1.js"></script>

@@ -704,6 +704,32 @@ function loopItems() {
   return currentShownItems().filter((it) => selectedIds.has(it.id));
 }
 
+// 把一筆內容完整念一遍：英文→中文→例句→例句中文→回覆句→回覆句中文（兩種循環播放共用）
+async function speakItemFull(it) {
+  if (!bestVoice) pickBestVoice();
+  await speakAsync(it.text, getEnVoice(), "en-US");
+  if (!isLooping) return;
+  if (it.zh) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (!isLooping) return;
+    await speakAsync(it.zh, getZhVoice(), "zh-TW");
+    if (!isLooping) return;
+  }
+  for (const [en, zhTxt] of [[it.example, it.exampleZh], [it.reply, it.replyZh]]) {
+    if (!en) continue;
+    await new Promise((r) => setTimeout(r, 250));
+    if (!isLooping) return;
+    await speakAsync(en, getEnVoice(), "en-US");
+    if (!isLooping) return;
+    if (zhTxt) {
+      await new Promise((r) => setTimeout(r, 250));
+      if (!isLooping) return;
+      await speakAsync(zhTxt, getZhVoice(), "zh-TW");
+      if (!isLooping) return;
+    }
+  }
+}
+
 function startLoop() {
   const shown = loopItems();
   if (!shown.length) {
@@ -724,32 +750,55 @@ function startLoop() {
     const it = list[idx];
     highlightRow(it.id);
     $lockCurrentText.textContent = it.text;
-
-    if (!bestVoice) pickBestVoice();
-    // 先念英文
-    await speakAsync(it.text, getEnVoice(), "en-US");
+    await speakItemFull(it);
     if (!isLooping) return;
-    // 再念中文（若有填中文）
-    if (it.zh) {
-      await new Promise((r) => setTimeout(r, 250));
-      if (!isLooping) return;
-      await speakAsync(it.zh, getZhVoice(), "zh-TW");
-      if (!isLooping) return;
+    idx++;
+    loopTimer = setTimeout(playNext, 500); // 每筆間隔
+  };
+
+  window.speechSynthesis.cancel();
+  playNext();
+}
+
+// ---- 複習頁循環播放：今日 N 個新字（依每日字數）→ 隨後接已學過的字（勾選資料夾內）----
+// ponytail: 純聽，不存單字本也不動每日進度；playlist 開始時算好一次，循環期間固定
+function reviewLoopList() {
+  const pack = currentPack();
+  const learnedKeys = new Set(items.map((it) => it.text.toLowerCase()));
+  const goal = dailyGoal();
+  const news = [];
+  outer:
+  for (const lv of pack.data) {
+    for (const w of lv.words) {
+      if (news.length >= goal) break outer;
+      if (learnedKeys.has(w.t.toLowerCase())) continue; // 已學過的不重複放進「新字」段
+      news.push({ text: w.t, zh: w.zh, example: w.ex, exampleZh: w.exZh, reply: w.re, replyZh: w.reZh });
     }
-    // 例句＋回覆句（若有）：英文→中文
-    for (const [en, zhTxt] of [[it.example, it.exampleZh], [it.reply, it.replyZh]]) {
-      if (!en) continue;
-      await new Promise((r) => setTimeout(r, 250));
-      if (!isLooping) return;
-      await speakAsync(en, getEnVoice(), "en-US");
-      if (!isLooping) return;
-      if (zhTxt) {
-        await new Promise((r) => setTimeout(r, 250));
-        if (!isLooping) return;
-        await speakAsync(zhTxt, getZhVoice(), "zh-TW");
-        if (!isLooping) return;
-      }
-    }
+  }
+  const learned = items.filter((it) => checkedFolderIds.has(it.folderId));
+  return [...news, ...learned];
+}
+
+function startReviewLoop() {
+  const list = reviewLoopList();
+  if (!list.length) {
+    alert("目前沒有可以循環播放的新字或單字 😊\n先挑一個單字包、或到單字本勾選資料夾。");
+    return;
+  }
+  isLooping = true;
+  const $dl = document.getElementById("dailyLoopBtn");
+  $dl.classList.add("playing");
+  $dl.textContent = "⏹️ 停止播放";
+  $lockOverlay.classList.remove("hidden");
+  let idx = 0;
+
+  const playNext = async () => {
+    if (!isLooping) return;
+    if (idx >= list.length) idx = 0; // 循環回到開頭
+    const it = list[idx];
+    $lockCurrentText.textContent = it.text;
+    await speakItemFull(it);
+    if (!isLooping) return;
     idx++;
     loopTimer = setTimeout(playNext, 500); // 每筆間隔
   };
@@ -764,6 +813,8 @@ function stopLoop() {
   window.speechSynthesis.cancel();
   $loopBtn.classList.remove("playing");
   $loopBtn.textContent = "🔁 循環播放";
+  const $dl = document.getElementById("dailyLoopBtn");
+  if ($dl) { $dl.classList.remove("playing"); $dl.textContent = "🔁 循環播放今日新字"; }
   $lockOverlay.classList.add("hidden");
   clearHighlight();
 }
@@ -2014,6 +2065,11 @@ document.getElementById("spellInput").addEventListener("keydown", (e) => {
 });
 document.getElementById("spellNext").addEventListener("click", nextSpellQuestion);
 document.getElementById("spellStop").addEventListener("click", stopSpell);
+
+document.getElementById("dailyLoopBtn").addEventListener("click", () => {
+  if (isLooping) stopLoop();
+  else startReviewLoop();
+});
 
 document.getElementById("clozeBtn").addEventListener("click", startCloze);
 document.getElementById("clozeNext").addEventListener("click", nextClozeQuestion);

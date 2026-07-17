@@ -98,6 +98,7 @@
         <li><b>✍️ 例句填空</b>：把單字的例句挖空（不給提示），從四個「長得很像」的選項挑正確的字；每個選項都附音節音標和 🔊 播放。答對答錯一樣連動複習排程，答完念完整例句對話。</li>
         <li><b>音節音標</b>：所有單字音標都以「·」標出音節分界（例：/ bə·ˈnæ·nə /），跟著一節一節念更好記。</li>
         <li><b>例句</b>：單字下方的 💬 例句和 ↩️ 回覆句都可以點一下發音，下面附整句音標。</li>
+        <li><b>🔁 循環播放今日新字</b>：在複習分頁按下去，會照你設定的每日字數，先把今天要學的新字一個個念（英文→中文→例句→回覆句），念完接著念已學過的字，一輪循環適合放著用聽的學；播放時畫面會鎖定，按「解鎖並停止播放」才停。純聽不會存進單字本、也不動每日進度。</li>
         <li><b>🔁 中翻英</b>：反過來考——看中文，從四個「長得很像」的英文字（附音標）挑正確的，練「想得出來」而不只「認得出來」。</li>
         <li><b>🔤 拼字測驗</b>：App 念單字＋顯示中文，把字拼出來按 Enter；逐字母比對，對的綠色、錯的紅色，錯了會顯示正確拼法。</li>
         <li><b>🔥 錯字加強</b>：任何測驗答錯的字自動收進錯字本（按鈕上會顯示幾個字），按下去只針對這些字加強；答對就從錯字本移出。</li>
@@ -114,7 +115,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.10.1</li>
+        <li><b class="dev-k">版本</b>：v1.10.2</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
@@ -130,6 +131,7 @@
       </div>
       <select id="packSelect" class="folder-select" title="選擇每日新字的單字包來源"></select>
       <button id="learnBtn" class="btn-primary tool-btn">🎧 學新字</button>
+      <button id="dailyLoopBtn" class="btn-loop tool-btn">🔁 循環播放今日新字</button>
       <button id="quizBtn" class="btn-loop tool-btn">🎧 聽力測驗</button>
       <button id="clozeBtn" class="btn-loop tool-btn">✍️ 例句填空</button>
       <button id="reverseBtn" class="btn-loop tool-btn">🔁 中翻英</button>

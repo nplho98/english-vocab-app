@@ -22,36 +22,6 @@
   --bulk-border: #fecaca;
 }
 
-/* ---- 深色模式：跟著系統走，只換變數 ---- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --blue: #3b82f6;
-    --blue-dark: #2563eb;
-    --bg: #0f172a;
-    --card: #1e293b;
-    --text: #e2e8f0;
-    --muted: #94a3b8;
-    --danger: #f87171;
-    --border: #334155;
-    --blue-soft: #1e3a5f;
-    --blue-soft-border: #2b4d7a;
-    --ok-bg: #14532d;
-    --ok-text: #86efac;
-    --ok-strong: #4ade80;
-    --err-bg: #7f1d1d;
-    --err-text: #fecaca;
-    --warn-bg: #453a16;
-    --warn-border: #713f12;
-    --warn-text: #fde68a;
-    --del-soft: #451a1a;
-    --bulk-bg: #2a1a1a;
-    --bulk-border: #7f1d1d;
-  }
-}
-
-input, textarea, select { color: var(--text); }
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {

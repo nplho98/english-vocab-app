@@ -104,6 +104,15 @@ function saveCheckedFolderIds() {
   localStorage.setItem(CHECKED_FOLDERS_KEY, JSON.stringify([...checkedFolderIds]));
 }
 const checkedFolderIds = loadCheckedFolderIds();
+// 一個資料夾都沒勾（換裝置、重裝 App、雲端同步下來的資料夾）＝單字本整頁空白，
+// 自動勾回「有存單字的真實資料夾」。ponytail: 不自動勾單字包的 30 個虛擬夾，否則一次畫 1500 列
+function autoCheckFoldersWithItems() {
+  if (checkedFolderIds.size > 0) return;
+  const has = new Set(items.map((it) => it.folderId));
+  folders.filter((f) => has.has(f.id)).forEach((f) => checkedFolderIds.add(f.id));
+  if (checkedFolderIds.size) saveCheckedFolderIds();
+}
+autoCheckFoldersWithItems();
 let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
@@ -375,15 +384,15 @@ async function backfillPhonetics() {
 
 // ---- 多選刪除 ----
 function updateBulkBar() {
-  // 移除已不存在的選取
+  // 移除已不存在的選取（pkw: 開頭＝單字包的虛擬字，不在 items 裡也要留著）
   for (const id of [...selectedIds]) {
-    if (!items.some((it) => it.id === id)) selectedIds.delete(id);
+    if (!String(id).startsWith("pkw:") && !items.some((it) => it.id === id)) selectedIds.delete(id);
   }
   saveSelectedIds();
-  $bulkBar.classList.toggle("hidden", items.length === 0);
-  $selCount.textContent = "已選 " + selectedIds.size + " 筆";
-  $delSelBtn.disabled = selectedIds.size === 0;
   const shown = currentShownItems();
+  $bulkBar.classList.toggle("hidden", items.length === 0 && shown.length === 0);
+  $selCount.textContent = "已選 " + selectedIds.size + " 筆";
+  $delSelBtn.disabled = ![...selectedIds].some((id) => !String(id).startsWith("pkw:"));
   $selectAll.checked = shown.length > 0 && shown.every((it) => selectedIds.has(it.id));
 }
 
@@ -396,7 +405,8 @@ function toggleSelectAll() {
 }
 
 function deleteSelected() {
-  const n = selectedIds.size;
+  // 單字包的虛擬字刪不了（本來就沒存），只算真的存在的
+  const n = items.filter((it) => selectedIds.has(it.id)).length;
   if (n === 0) return;
   if (!confirm("確定刪除選取的 " + n + " 筆？")) return;
   items = items.filter((it) => !selectedIds.has(it.id));
@@ -459,23 +469,25 @@ function toggleFolderChecked(id, checked) {
 function renderFolders() {
   if (!$folderList) return;
   $folderList.innerHTML = "";
+  const all = allFolders();
+  const learned = learnedTextSet();
   const $folderSummaryCount = document.getElementById("folderSummaryCount");
-  if ($folderSummaryCount) $folderSummaryCount.textContent = folders.length;
+  if ($folderSummaryCount) $folderSummaryCount.textContent = all.length;
 
   // 兩層結構：五大分類當標題，底下列各自的資料夾（空分類也顯示，讓 Boss 知道有這一類）
   CATEGORIES.forEach((cat) => {
-    const catFolders = folders.filter((f) => (f.cat || "日常生活常用") === cat);
+    const catFolders = all.filter((f) => (f.cat || "日常生活常用") === cat);
     const head = document.createElement("div");
     head.className = "cat-head";
-    const total = catFolders.reduce((n, f) => n + items.filter((it) => it.folderId === f.id).length, 0);
+    const total = catFolders.reduce((n, f) => n + folderCount(f, learned), 0);
     head.textContent = "📂 " + cat + "（" + catFolders.length + " 夾 / " + total + " 筆）";
     $folderList.appendChild(head);
-    catFolders.forEach((f) => renderFolderChip(f));
+    catFolders.forEach((f) => renderFolderChip(f, learned));
   });
 }
 
-function renderFolderChip(f) {
-    const count = items.filter((it) => it.folderId === f.id).length;
+function renderFolderChip(f, learned) {
+    const count = folderCount(f, learned);
     const chip = document.createElement("div");
     chip.className = "folder-chip";
 
@@ -497,17 +509,20 @@ function renderFolderChip(f) {
     };
     chip.appendChild(name);
 
-    const editBtn = document.createElement("button");
-    editBtn.className = "folder-edit";
-    editBtn.textContent = "✏️";
-    editBtn.onclick = (e) => { e.stopPropagation(); renameFolder(f.id); };
-    chip.appendChild(editBtn);
+    // 單字包的虛擬資料夾不能改名/刪除（它不是真的存在，是單字包直接列出來的）
+    if (!f.virtual) {
+      const editBtn = document.createElement("button");
+      editBtn.className = "folder-edit";
+      editBtn.textContent = "✏️";
+      editBtn.onclick = (e) => { e.stopPropagation(); renameFolder(f.id); };
+      chip.appendChild(editBtn);
 
-    const delBtn = document.createElement("button");
-    delBtn.className = "folder-del";
-    delBtn.textContent = "🗑️";
-    delBtn.onclick = (e) => { e.stopPropagation(); deleteFolder(f.id); };
-    chip.appendChild(delBtn);
+      const delBtn = document.createElement("button");
+      delBtn.className = "folder-del";
+      delBtn.textContent = "🗑️";
+      delBtn.onclick = (e) => { e.stopPropagation(); deleteFolder(f.id); };
+      chip.appendChild(delBtn);
+    }
 
     $folderList.appendChild(chip);
 }
@@ -819,13 +834,74 @@ function stopLoop() {
   clearHighlight();
 }
 
+// ---- 內建單字包直接列在單字本：唯讀、不寫進 localStorage、不同步 Firestore ----
+// ponytail: 1500 字只在記憶體展開；同名真實資料夾優先，避免畫面出現兩個「國小L1」
+// ponytail: 全部資料夾都勾＝一次畫 1500 列，手機會頓；真的卡再做分頁或虛擬捲動
+// 名稱＋分類都對得上才算是單字包資料夾（Boss 自建的同名夾不會被誤綁）
+function packLevelWords(folder) {
+  const cat = folder.cat || "日常生活常用";
+  for (const p of PACKS) {
+    if (p.cat !== cat || !p.prefix || !folder.name.startsWith(p.prefix)) continue;
+    const lv = p.data.find((l) => p.prefix + l.level === folder.name);
+    if (lv) return lv.words;
+  }
+  return [];
+}
+function isPackFolder(name, cat) {
+  return folders.some((f) => f.name === name && (f.cat || "日常生活常用") === cat);
+}
+function packVirtualFolders() {
+  const out = [];
+  PACKS.forEach((p) => {
+    p.data.forEach((lv) => {
+      const name = p.prefix + lv.level;
+      if (isPackFolder(name, p.cat)) return; // 已經有真的資料夾（裡面有學過的字）就用真的
+      out.push({ id: "pk:" + p.key + ":" + lv.level, name, cat: p.cat, virtual: true });
+    });
+  });
+  return out;
+}
+function allFolders() {
+  return folders.concat(packVirtualFolders());
+}
+function learnedTextSet() {
+  return new Set(items.map((it) => it.text.toLowerCase()));
+}
+// 這個資料夾對應的單字包內容，扣掉已經學過（已經在 items 裡）的字
+function virtualItemsOf(folder, learned) {
+  const words = packLevelWords(folder);
+  if (!words.length) return [];
+  const done = learned || learnedTextSet();
+  return words
+    .filter((w) => !done.has(w.t.toLowerCase()))
+    .map((w, i) => ({
+      id: "pkw:" + folder.id + ":" + i,
+      folderId: folder.id,
+      text: w.t,
+      zh: w.zh,
+      phonetic: w.ph || null,
+      example: w.ex || null,
+      exampleZh: w.exZh || "",
+      reply: w.re || null,
+      replyZh: w.reZh || "",
+      sentence: false,
+      virtual: true,
+    }));
+}
+function folderCount(f, learned) {
+  return items.filter((it) => it.folderId === f.id).length + virtualItemsOf(f, learned).length;
+}
+
 function currentShownItems() {
   if (checkedFolderIds.size === 0) return [];
   const keyword = $search.value.trim().toLowerCase();
-  return items.filter(
-    (it) =>
-      checkedFolderIds.has(it.folderId) &&
-      (it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword))
+  const learned = learnedTextSet();
+  const list = items.filter((it) => checkedFolderIds.has(it.folderId));
+  allFolders()
+    .filter((f) => checkedFolderIds.has(f.id))
+    .forEach((f) => list.push(...virtualItemsOf(f, learned)));
+  return list.filter(
+    (it) => it.text.toLowerCase().includes(keyword) || (it.zh || "").toLowerCase().includes(keyword)
   );
 }
 
@@ -864,7 +940,7 @@ function render() {
     upBtn.className = "move-btn";
     upBtn.textContent = "▲";
     upBtn.title = "往上移";
-    upBtn.disabled = idx === 0;
+    upBtn.disabled = idx === 0 || it.virtual; // 單字包的字順序照單字包，不能搬
     upBtn.onclick = () => moveItem(it.id, "up");
 
     const check = document.createElement("input");
@@ -882,7 +958,7 @@ function render() {
     downBtn.className = "move-btn";
     downBtn.textContent = "▼";
     downBtn.title = "往下移";
-    downBtn.disabled = idx === shown.length - 1;
+    downBtn.disabled = idx === shown.length - 1 || it.virtual;
     downBtn.onclick = () => moveItem(it.id, "down");
 
     moveBox.append(upBtn, check, downBtn);
@@ -896,6 +972,14 @@ function render() {
     txt.textContent = it.text;
     main.appendChild(txt);
 
+    if (it.virtual) {
+      const tag = document.createElement("span");
+      tag.className = "item-tag";
+      tag.textContent = "未學";
+      tag.title = "單字包裡的字，按「🎧 學新字」學到它才會變成你的單字（可編輯、進複習）";
+      main.appendChild(tag);
+    }
+
     if (it.sentence) {
       const tag = document.createElement("span");
       tag.className = "item-tag";
@@ -903,24 +987,29 @@ function render() {
       main.appendChild(tag);
     } else {
       const ph = document.createElement("div");
+      const canEdit = !it.virtual; // 單字包的字唯讀
       if (it.phonetic) {
-        ph.className = "item-phonetic editable";
+        ph.className = "item-phonetic" + (canEdit ? " editable" : "");
         ph.textContent = phDisplay(it.phonetic);
       } else {
-        ph.className = "item-phonetic missing editable";
-        ph.textContent = "（字典查無音標，點我手動加）";
+        ph.className = "item-phonetic missing" + (canEdit ? " editable" : "");
+        ph.textContent = canEdit ? "（字典查無音標，點我手動加）" : "";
       }
-      ph.title = "點一下可手動輸入/修改音標";
-      ph.onclick = () => editPhonetic(it.id);
+      if (canEdit) {
+        ph.title = "點一下可手動輸入/修改音標";
+        ph.onclick = () => editPhonetic(it.id);
+      }
       main.appendChild(ph);
     }
 
     if (it.zh) {
       const zh = document.createElement("div");
-      zh.className = "item-zh editable";
+      zh.className = "item-zh" + (it.virtual ? "" : " editable");
       zh.textContent = it.zh;
-      zh.title = "點一下可修改中文";
-      zh.onclick = () => editZh(it.id);
+      if (!it.virtual) {
+        zh.title = "點一下可修改中文";
+        zh.onclick = () => editZh(it.id);
+      }
       main.appendChild(zh);
     }
 
@@ -945,15 +1034,17 @@ function render() {
       if (it.zh) { await new Promise(r => setTimeout(r, 500)); await speakAsync(it.zh, getZhVoice(), "zh-TW"); }
     };
 
-    const delBtn = document.createElement("button");
-    delBtn.className = "icon-btn del-btn";
-    delBtn.textContent = "🗑️";
-    delBtn.title = "刪除";
-    delBtn.onclick = () => {
-      if (confirm("確定刪除「" + it.text + "」？")) deleteItem(it.id);
-    };
-
-    actions.append(speakBtn, delBtn);
+    actions.appendChild(speakBtn);
+    if (!it.virtual) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "icon-btn del-btn";
+      delBtn.textContent = "🗑️";
+      delBtn.title = "刪除";
+      delBtn.onclick = () => {
+        if (confirm("確定刪除「" + it.text + "」？")) deleteItem(it.id);
+      };
+      actions.appendChild(delBtn);
+    }
     li.append(main, actions);
     $list.appendChild(li);
   });
@@ -1162,7 +1253,7 @@ function importData(file) {
 
 // ---- 單字卡：把目前勾選的單字/句子排成可列印的小卡（方案三） ----
 function exportFlashcards() {
-  const chosen = items.filter((it) => selectedIds.has(it.id));
+  const chosen = currentShownItems().filter((it) => selectedIds.has(it.id));
   if (!chosen.length) {
     alert("請先在單字本清單裡勾選想做成單字卡的單字或句子。");
     return;
@@ -1484,12 +1575,14 @@ function nextPackWord() {
 // 新字收進「所屬分類」底下對應等級的資料夾（沒有就自動建）
 function packFolderId(pack, level) {
   const name = pack.prefix + level;
-  let f = folders.find((x) => x.name === name);
+  let f = folders.find((x) => x.name === name && (x.cat || "日常生活常用") === pack.cat);
   if (!f) {
     f = { id: genId(), name, cat: pack.cat };
     folders.push(f);
     saveFolders();
   }
+  // 這一級原本是虛擬資料夾，勾選狀態要搬到新的真實資料夾，否則學完字反而看不到
+  checkedFolderIds.delete("pk:" + pack.key + ":" + level);
   checkedFolderIds.add(f.id);
   saveCheckedFolderIds();
   return f.id;
@@ -2195,6 +2288,7 @@ function initFirebase() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
       localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
       purgeOrphanItems();
+      autoCheckFoldersWithItems(); // 雲端拉下來的資料夾在本機沒勾過，補勾才看得到
       render();
       renderFolders();
       renderAddFolderSelect();

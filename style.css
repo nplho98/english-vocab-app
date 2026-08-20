@@ -149,6 +149,26 @@ body {
 }
 .notice.hidden { display: none; }
 
+.account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.account-btn {
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+  color: inherit;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.account-btn:disabled { opacity: .55; cursor: wait; }
+.account-btn.hidden { display: none; }
+
 .folder-select {
   width: 100%; padding: 12px; font-size: 1rem; font-family: inherit;
   border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text);

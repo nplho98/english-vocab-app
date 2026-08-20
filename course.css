@@ -1,0 +1,188 @@
+/* course.css — 課程頁專用樣式
+   沿用 style.css 的 CSS 變數（--blue / --card / --muted…），只加課程頁需要的東西。
+   刻意不動 style.css，避免影響背單字頁。 */
+
+/* ---- 進度列 ---- */
+.course-bar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  position: sticky; top: 0; z-index: 10;
+}
+.course-bar-main { display: flex; align-items: center; gap: 10px; }
+.day-badge {
+  background: var(--blue); color: #fff;
+  font-weight: 700; font-size: 0.95rem;
+  padding: 3px 10px; border-radius: 999px;
+}
+.phase-tag { color: var(--muted); font-size: 0.82rem; }
+.progress-track {
+  height: 6px; background: var(--bg); border-radius: 999px;
+  margin-top: 10px; overflow: hidden;
+}
+.progress-fill { height: 100%; background: var(--blue); border-radius: 999px; transition: width .3s; }
+.progress-note { font-size: 0.75rem; color: var(--muted); margin-top: 5px; }
+
+/* ---- 區塊 ---- */
+.course-box { margin-bottom: 14px; }
+.course-h2 { font-size: 1rem; margin-bottom: 8px; }
+.course-sub { font-size: 0.78rem; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.scene-note {
+  background: var(--blue-soft); border: 1px solid var(--blue-soft-border);
+  border-radius: 8px; padding: 9px 11px;
+  font-size: 0.85rem; line-height: 1.6; margin-bottom: 12px;
+}
+.course-hint { font-size: 0.78rem; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+
+/* ---- 今日課表 ---- */
+.slot-list { list-style: none; }
+.slot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 4px; border-bottom: 1px solid var(--border);
+}
+.slot:last-child { border-bottom: none; }
+.slot-time {
+  font-size: 0.72rem; color: var(--muted);
+  min-width: 42px; text-align: right;
+}
+.slot-name { flex: 1; font-size: 0.9rem; }
+.slot-check { color: var(--muted); font-size: 1.1rem; }
+.slot.done .slot-check { color: var(--ok-strong); }
+.slot.done .slot-name { color: var(--muted); text-decoration: line-through; }
+
+/* ---- 對話 ---- */
+.dlg-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.dlg-toggle { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.dlg-speed {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.78rem; color: var(--muted); margin-bottom: 12px;
+}
+.dlg-speed input[type="range"] { flex: 1; }
+
+.dialogue { display: flex; flex-direction: column; gap: 8px; }
+.dlg-line {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; background: var(--bg);
+}
+.dlg-line.speaking { background: var(--blue-soft); }
+.dlg-who {
+  font-size: 0.72rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+}
+.who-m { background: #dbeafe; color: #1e40af; }
+.who-f { background: #fce7f3; color: #9d174d; }
+.dlg-en { flex: 1; font-size: 0.95rem; line-height: 1.5; }
+/* 蓋住逐字稿：只練耳朵，點一下才掀開 */
+.dialogue.hide-script .dlg-en {
+  color: transparent; background: var(--border); border-radius: 4px; cursor: pointer;
+}
+.dialogue.hide-script .dlg-en.revealed { color: var(--text); background: none; }
+
+/* ---- 縮寫／固定說法 ---- */
+.course-details { margin-top: 12px; }
+.ctr-list, .fixed-list { list-style: none; font-size: 0.85rem; line-height: 1.9; }
+.ctr-list code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+.ctr-note { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+.fixed-list li { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.fixed-list li:last-child { border-bottom: none; }
+.fixed-note { display: block; font-size: 0.75rem; color: var(--muted); }
+
+/* ---- 句型練習 ---- */
+.drill { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.drill:last-of-type { border-bottom: none; }
+.drill-pattern { font-size: 1.05rem; margin-bottom: 10px; }
+.drill-slot {
+  background: var(--warn-bg); border-bottom: 2px solid var(--warn-border);
+  padding: 0 8px; font-weight: 700;
+}
+.drill-slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.slot-chip {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px 12px;
+  font-size: 0.85rem; cursor: pointer;
+}
+.slot-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* ---- AI prompt ---- */
+.ai-prompt-box {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px; margin: 10px 0;
+  max-height: 220px; overflow-y: auto;
+}
+.ai-prompt-box pre {
+  font-family: -apple-system, "Noto Sans TC", "Segoe UI", sans-serif;
+  font-size: 0.8rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
+}
+.ai-actions { display: flex; gap: 8px; }
+
+/* ---- Daily Check ---- */
+.check-part { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.check-h3 { font-size: 0.88rem; margin-bottom: 8px; }
+.check-score { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.check-input {
+  flex: 1; padding: 8px 10px; font-size: 0.9rem;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+}
+.check-zh { flex: 1; font-size: 0.9rem; }
+.btn-rec { background: var(--card); border: 1px solid var(--danger); color: var(--danger); }
+.check-self {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: 0.82rem; color: var(--text);
+}
+.check-input.correct { border-color: #16a34a; background: #f0fdf4; }
+.check-input.wrong { border-color: var(--danger); background: #fef2f2; }
+.answer-note { display: block; font-size: 0.75rem; color: var(--muted); margin: -4px 0 8px 42px; }
+.check-result {
+  margin-top: 10px; padding: 10px 12px; border-radius: 8px; font-weight: 700;
+}
+.check-result.pass { background: #dcfce7; color: #166534; }
+.check-result.fail { background: var(--warn-bg); color: var(--warn-text); }
+.exam-score-row { display: flex; gap: 8px; margin-top: 10px; }
+.exam-score-row .check-input { min-width: 0; }
+
+/* ---- 錄音 ---- */
+.record-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.record-actions .recording { background: var(--danger); color: #fff; }
+.milestone-box {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+
+/* ---- 按鈕 ---- */
+.course-btn {
+  padding: 9px 14px; border-radius: 8px; border: none;
+  font-size: 0.88rem; cursor: pointer;
+}
+.course-btn.full { width: 100%; display: block; text-align: center; text-decoration: none; }
+.btn-ghost { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+
+/* ---- 底部 ---- */
+.course-foot { margin-top: 20px; text-align: center; }
+.course-foot .dev-copyright { margin-top: 14px; font-size: 0.72rem; color: var(--muted); }
+
+/* ---- 進入課程／回背單字的互連入口 ---- */
+.cross-entry {
+  display: block; text-align: center; text-decoration: none;
+  background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+  color: #fff; padding: 12px; border-radius: 10px;
+  font-size: 0.92rem; font-weight: 600; margin-bottom: 14px;
+}
+
+/* ---- 換日按鈕 ---- */
+.day-nav {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; width: 28px; height: 28px;
+  font-size: 1.1rem; line-height: 1; cursor: pointer; color: var(--text);
+}
+.day-nav:disabled { opacity: 0.35; cursor: default; }
+.course-bar-main .phase-tag { flex: 1; }
+
+/* ---- 短文 ---- */
+.passage-en { font-size: 0.95rem; line-height: 1.9; white-space: pre-line; margin-bottom: 8px; }
+.passage-zh { font-size: 0.85rem; color: var(--muted); line-height: 1.8; white-space: pre-line; margin-bottom: 10px; }
+
+/* ---- 沒有英文語音的警告 ---- */
+#voiceWarn {
+  background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+  border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; line-height: 1.7; margin-bottom: 14px;
+}

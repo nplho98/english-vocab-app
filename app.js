@@ -116,13 +116,7 @@ autoCheckFoldersWithItems();
 let lookupCurrent = null; // 查詢頁目前查到的結果 { text, zh, phonetic, sentence }
 
 // 舊資料沒有資料夾欄位：不自動建資料夾，只在清單顯示，新增仍須等使用者自己建資料夾才開放
-// 語速：從本機讀回，夾在 0.5～1.5 之間，壞值回到 1（關 App 不忘記）
-function loadSpeechRate() {
-  const r = parseFloat(localStorage.getItem("speech_rate"));
-  if (!isFinite(r)) return 1;
-  return Math.min(1.5, Math.max(0.5, r));
-}
-let speechRate = loadSpeechRate();
+// 語速 speechRate / loadSpeechRate() 已移至 speech.js（與 course.html 共用）
 let isLooping = false;
 let loopTimer = null;
 
@@ -595,124 +589,16 @@ function moveItem(id, dir) {
   render();
 }
 
-// ---- 挑選最自然的英文語音 ----
-let bestVoice = null;
-function pickBestVoice() {
-  const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-  if (!voices.length) return;
-  const en = voices.filter((v) => /^en(-|_)/i.test(v.lang) || /english/i.test(v.name));
-  // 依優先順序找最自然的：Natural > 雲端高品質 > 知名人聲 > 任何 en-US
-  const prefer = [
-    (v) => /natural/i.test(v.name),
-    (v) => /google.*us english/i.test(v.name),
-    (v) => /(aria|jenny|guy|emma|libby)/i.test(v.name),
-    (v) => /(samantha|alex|daniel|karen|moira)/i.test(v.name),
-    (v) => /en-US/i.test(v.lang),
-  ];
-  for (const test of prefer) {
-    const found = en.find(test);
-    if (found) { bestVoice = found; return; }
-  }
-  bestVoice = en[0] || voices[0];
-}
-// ---- 挑選最自然的中文語音（與英文同樣的挑選邏輯）----
-let zhVoice = null;
-function pickZhVoice() {
-  const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-  if (!voices.length) return;
-  const zh = voices.filter((v) => /^zh(-|_)/i.test(v.lang) || /chinese|國語|普通话|中文/i.test(v.name));
-  // 依優先順序找最自然的：Natural > 知名人聲 > 任何中文（優先繁中台灣）
-  const prefer = [
-    (v) => /natural/i.test(v.name) && /zh-TW/i.test(v.lang),
-    (v) => /natural/i.test(v.name),
-    (v) => /(hsiaochen|hsiaoyu|yating|mei-jia|sin-ji|google 國語)/i.test(v.name),
-    (v) => /zh-TW/i.test(v.lang),
-    (v) => /zh-HK/i.test(v.lang),
-    (v) => /^zh/i.test(v.lang),
-  ];
-  for (const test of prefer) {
-    const found = zh.find(test);
-    if (found) { zhVoice = found; return; }
-  }
-  zhVoice = zh[0] || null;
-}
-// ---- 使用者自選語音（記住在本機）----
-let userEnVoiceURI = localStorage.getItem("en_voice_uri") || "";
-let userZhVoiceURI = localStorage.getItem("zh_voice_uri") || "";
-
-function allVoices() {
-  return window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-}
-// 實際使用的英文語音：使用者選的 > 自動挑的
-function getEnVoice() {
-  const v = allVoices().find((x) => x.voiceURI === userEnVoiceURI);
-  return v || bestVoice;
-}
-function getZhVoice() {
-  const v = allVoices().find((x) => x.voiceURI === userZhVoiceURI);
-  return v || zhVoice;
-}
-
-// 把可用語音填進下拉選單
-function fillVoiceSelect(sel, filterFn, currentURI) {
-  if (!sel) return;
-  const list = allVoices().filter(filterFn);
-  sel.innerHTML = '<option value="">（自動挑選最自然）</option>';
-  list.forEach((v) => {
-    const opt = document.createElement("option");
-    opt.value = v.voiceURI;
-    opt.textContent = v.name + "（" + v.lang + "）";
-    if (v.voiceURI === currentURI) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
+// 語音挑選、使用者自選、清單填充（pickBestVoice / getEnVoice / fillVoiceSelect 等）
+// 已移至 speech.js（與 course.html 共用）。這裡只留與本頁 DOM 綁定的選單填充，
+// 並註冊給 speech.js 在語音清單就緒時呼叫。
 function populateVoiceMenus() {
   fillVoiceSelect($enVoice, (v) => /^en(-|_)/i.test(v.lang) || /english/i.test(v.name), userEnVoiceURI);
   fillVoiceSelect($zhVoice, (v) => /^zh(-|_)/i.test(v.lang) || /chinese|國語|普通话|中文/i.test(v.name), userZhVoiceURI);
 }
+setVoicesReadyCallback(populateVoiceMenus);
 
-if ("speechSynthesis" in window) {
-  pickBestVoice();
-  pickZhVoice();
-  populateVoiceMenus();
-  window.speechSynthesis.onvoiceschanged = () => {
-    pickBestVoice(); pickZhVoice(); populateVoiceMenus();
-  };
-}
-
-// 念出一段文字（指定語言/語音），回傳 Promise，念完才 resolve
-function speakAsync(text, voice, lang) {
-  return new Promise((resolve) => {
-    if (!text || !("speechSynthesis" in window)) { resolve(); return; }
-    const u = new SpeechSynthesisUtterance(text);
-    if (voice) u.voice = voice;
-    u.lang = (voice && voice.lang) || lang;
-    u.rate = speechRate;
-    u.onend = u.onerror = () => resolve();
-    window.speechSynthesis.speak(u);
-  });
-}
-
-// ---- 發音（手機內建英文 TTS，離線可用）----
-function speak(text, el) {
-  if (!("speechSynthesis" in window)) {
-    alert("這台裝置不支援語音發音功能 😢");
-    return;
-  }
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  if (!bestVoice) pickBestVoice();
-  const v = getEnVoice();
-  if (v) u.voice = v;
-  u.lang = (v && v.lang) || "en-US";
-  u.rate = speechRate;
-  u.pitch = 1;
-  if (el) {
-    el.classList.add("speaking");
-    u.onend = u.onerror = () => el.classList.remove("speaking");
-  }
-  window.speechSynthesis.speak(u);
-}
+// speakAsync() 與 speak() 已移至 speech.js（與 course.html 共用）
 
 // ---- 一鍵循環播放（依目前清單順序，念完最後一筆回到第一筆）----
 function loopItems() {
@@ -2245,7 +2131,7 @@ let uid = null;
 function syncToFirestore() {
   if (!db || !uid) return;
   db.collection("users").doc(uid).collection("data").doc("main")
-    .set({ items, folders });
+    .set({ items, folders }, { merge: true });
 }
 
 function syncFoldersToInbox() {
@@ -2254,9 +2140,109 @@ function syncFoldersToInbox() {
     .set({ names: folders.map(f => f.name) });
 }
 
+let mainSyncUnsubscribe = null;
+let inboxSyncStarted = false;
+
+function updateAccountUi(user, message) {
+  const status = document.getElementById("accountStatus");
+  const login = document.getElementById("googleLogin");
+  const logout = document.getElementById("googleLogout");
+  if (status) status.textContent = message || EnglishSync.userLabel(user);
+  if (login) login.classList.toggle("hidden", !!user && !user.isAnonymous);
+  if (logout) logout.classList.toggle("hidden", !user || user.isAnonymous);
+}
+
+async function loadAndMergeMainData(user) {
+  uid = user.uid;
+  const ref = db.collection("users").doc(uid).collection("data").doc("main");
+  const snap = await ref.get();
+  const local = { items, folders };
+  const merged = EnglishSync.mergeMainData(snap.exists ? snap.data() : {}, local);
+  items = (merged.items || []).map((it) => {
+    if (typeof it.box !== "number") it.box = 0;
+    if (typeof it.due !== "number") it.due = Date.now();
+    return it;
+  });
+  folders = merged.folders || [];
+  migrateFolderCats(folders);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+  purgeOrphanItems();
+  autoCheckFoldersWithItems();
+  await ref.set({ items, folders }, { merge: true });
+  render();
+  renderFolders();
+  renderAddFolderSelect();
+  updateDueBadge();
+
+  if (mainSyncUnsubscribe) mainSyncUnsubscribe();
+  mainSyncUnsubscribe = ref.onSnapshot((nextSnap) => {
+    if (nextSnap.metadata.hasPendingWrites || !nextSnap.exists) return;
+    const next = EnglishSync.mergeMainData(nextSnap.data(), { items, folders });
+    items = next.items || [];
+    folders = next.folders || [];
+    migrateFolderCats(folders);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+    autoCheckFoldersWithItems();
+    render();
+    renderFolders();
+    renderAddFolderSelect();
+    updateDueBadge();
+  });
+}
+
+function startInboxSync() {
+  if (inboxSyncStarted) return;
+  inboxSyncStarted = true;
+  syncFoldersToInbox();
+  const inboxStartTs = Date.now();
+  db.collection("vocab-inbox").doc("latest").onSnapshot((snap) => {
+    if (!snap.exists) return;
+    const data = snap.data();
+    const ts = parseInt(data.ts) || 0;
+    if (ts < inboxStartTs) return;
+    let entry;
+    try { entry = JSON.parse(data.entry); } catch { return; }
+
+    const folderName = data.folder || "翻譯工具";
+    let folder = folders.find(f => f.name === folderName);
+    if (!folder) {
+      folder = { id: genId(), name: folderName, cat: guessCat(folderName) };
+      folders.push(folder);
+      checkedFolderIds.add(folder.id);
+    }
+
+    let text, zh, phonetic = null, sentence = false;
+    if (entry.type === "en_word") {
+      text = entry.input; zh = entry.translation; phonetic = entry.kk || null;
+    } else if (entry.type === "en_sentence") {
+      text = entry.input; zh = entry.translation; sentence = true;
+    } else if (entry.type === "zh_to_en") {
+      text = entry.translation; zh = entry.input;
+      sentence = text.trim().split(/\s+/).length > 1;
+    } else { return; }
+
+    if (items.some(it => it.folderId === folder.id && it.text === text)) return;
+    items.unshift({
+      id: genId(), text, zh, phonetic, sentence,
+      example: entry.example || null, exampleZh: entry.exampleZh || "",
+      reply: entry.reply || null, replyZh: entry.replyZh || "",
+      folderId: folder.id, box: 0, due: Date.now(),
+    });
+    saveItems();
+    saveFolders();
+    saveCheckedFolderIds();
+    render();
+    renderFolders();
+    renderAddFolderSelect();
+    showToast(`已加入：${text}`);
+  });
+}
+
 function initFirebase() {
   if (typeof firebase === "undefined") return;
-  firebase.initializeApp({
+  if (!firebase.apps.length) firebase.initializeApp({
     apiKey: "AIzaSyDq6JsRO2_FwoEsGtaiGvUcY2log58H_Js",
     authDomain: "english-e754f.firebaseapp.com",
     projectId: "english-e754f",
@@ -2267,79 +2253,32 @@ function initFirebase() {
   db = firebase.firestore();
   db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
-  firebase.auth().signInAnonymously().then((cred) => {
-    uid = cred.user.uid;
-    syncFoldersToInbox();
-    const ref = db.collection("users").doc(uid).collection("data").doc("main");
-    ref.onSnapshot((snap) => {
-      if (snap.metadata.hasPendingWrites) return;
-      if (!snap.exists) {
-        if (items.length > 0 || folders.length > 0) syncToFirestore();
-        return;
-      }
-      const data = snap.data();
-      items = (data.items || []).map((it) => {
-        if (typeof it.box !== "number") it.box = 0;
-        if (typeof it.due !== "number") it.due = Date.now();
-        return it;
-      });
-      folders = data.folders || [];
-      migrateFolderCats(folders);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
-      purgeOrphanItems();
-      autoCheckFoldersWithItems(); // 雲端拉下來的資料夾在本機沒勾過，補勾才看得到
-      render();
-      renderFolders();
-      renderAddFolderSelect();
-      updateDueBadge();
-      syncFoldersToInbox();
-    });
-
-    // ---- 翻譯工具收件 ----
-    const inboxStartTs = Date.now();
-    db.collection("vocab-inbox").doc("latest").onSnapshot((snap) => {
-      if (!snap.exists) return;
-      const data = snap.data();
-      const ts = parseInt(data.ts) || 0;
-      if (ts < inboxStartTs) return;
-      let entry;
-      try { entry = JSON.parse(data.entry); } catch { return; }
-
-      const folderName = data.folder || "翻譯工具";
-      let folder = folders.find(f => f.name === folderName);
-      if (!folder) {
-        folder = { id: genId(), name: folderName, cat: guessCat(folderName) };
-        folders.push(folder);
-        checkedFolderIds.add(folder.id);
-      }
-
-      let text, zh, phonetic = null, sentence = false;
-      if (entry.type === "en_word") {
-        text = entry.input; zh = entry.translation; phonetic = entry.kk || null;
-      } else if (entry.type === "en_sentence") {
-        text = entry.input; zh = entry.translation; sentence = true;
-      } else if (entry.type === "zh_to_en") {
-        text = entry.translation; zh = entry.input;
-        sentence = text.trim().split(/\s+/).length > 1;
-      } else { return; }
-
-      if (items.some(it => it.folderId === folder.id && it.text === text)) return;
-      items.unshift({
-        id: genId(), text, zh, phonetic, sentence,
-        example: entry.example || null, exampleZh: entry.exampleZh || "",
-        reply: entry.reply || null, replyZh: entry.replyZh || "",
-        folderId: folder.id, box: 0, due: Date.now(),
-      });
-      saveItems();
-      saveFolders();
-      saveCheckedFolderIds();
-      render();
-      renderFolders();
-      renderAddFolderSelect();
-      showToast(`已加入：${text}`);
-    });
-  }).catch(console.error);
+  const auth = firebase.auth();
+  document.getElementById("googleLogin").addEventListener("click", async () => {
+    const button = document.getElementById("googleLogin");
+    button.disabled = true;
+    updateAccountUi(auth.currentUser, "正在開啟 Google 登入");
+    try { await EnglishSync.signInWithGoogle(auth); }
+    catch (error) {
+      console.error(error);
+      updateAccountUi(auth.currentUser, "Google 登入未完成");
+    } finally { button.disabled = false; }
+  });
+  document.getElementById("googleLogout").addEventListener("click", async () => {
+    await auth.signOut();
+    await auth.signInAnonymously();
+  });
+  auth.onAuthStateChanged(async (user) => {
+    try {
+      if (!user) { await auth.signInAnonymously(); return; }
+      updateAccountUi(user, user.isAnonymous ? "目前只存在這台裝置" : `已同步：${EnglishSync.userLabel(user)}`);
+      await loadAndMergeMainData(user);
+      startInboxSync();
+    } catch (error) {
+      console.error(error);
+      updateAccountUi(user, "本機資料正常；雲端同步失敗");
+    }
+  });
 }
 
 function showToast(msg) {

@@ -1,7 +1,7 @@
 {
-  "name": "我的英文背單字本",
-  "short_name": "背單字本",
-  "description": "新增、刪除英文單字與句子，附音標與發音，離線可用。",
+  "name": "我不要再當英文小白",
+  "short_name": "英文小白",
+  "description": "三個月零基礎到高中的英文課程，聽說為主；內建單字本，附音標與發音，離線可用。",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",

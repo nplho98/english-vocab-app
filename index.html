@@ -9,11 +9,17 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <title>我的英文背單字本</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="course.css" />
 </head>
 <body>
   <header class="app-header">
     <h1>📖 我的英文背單字本</h1>
     <p class="subtitle">單字自動標音標 · 點一下就發音 · 離線本機儲存</p>
+    <div class="account-bar">
+      <span id="accountStatus">同步功能準備中</span>
+      <button id="googleLogin" class="account-btn" type="button">使用 Google 同步</button>
+      <button id="googleLogout" class="account-btn hidden" type="button">登出</button>
+    </div>
   </header>
 
   <nav class="tabbar">
@@ -30,6 +36,7 @@
   <input type="file" id="importFile" accept="application/json,.json,text/plain,.txt" class="hidden" />
 
   <main class="container">
+   <a href="course.html" class="cross-entry">🎯 進入課程：我不要再當英文小白</a>
    <div class="tab-page active" id="tab-add">
     <section class="add-box tool-box">
       <textarea id="input" rows="2" placeholder="輸入英文單字或句子，例如：apple 或 How are you?"></textarea>
@@ -115,7 +122,7 @@
       <ul>
         <li><b class="dev-k">開發者</b>：何朋哲</li>
         <li><b class="dev-k">Mail</b>：<a href="mailto:nplho98@gmail.com">nplho98@gmail.com</a></li>
-        <li><b class="dev-k">版本</b>：v1.10.3</li>
+        <li><b class="dev-k">版本</b>：v1.20.0</li>
       </ul>
       <p class="dev-copyright">© 2026 何朋哲. All rights reserved.</p>
     </details>
@@ -257,6 +264,8 @@
   <script src="pack-jhs2.js"></script>
   <script src="pack-jhs3.js"></script>
   <script src="pack-sent-ph.js"></script>
+  <script src="sync.js?v=1.20.0"></script>
+  <script src="speech.js?v=1.20.0"></script>
   <script src="app.js"></script>
 </body>
 </html>

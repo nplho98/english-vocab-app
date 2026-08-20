@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>我不要再當英文小白</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="course.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🎯 我不要再當英文小白</h1>
+    <p class="subtitle">三個月 · 零基礎到高中 · 聽說為主</p>
+    <div class="account-bar">
+      <span id="courseAccountStatus">同步功能準備中</span>
+      <button id="courseGoogleLogin" class="account-btn" type="button">使用 Google 同步</button>
+      <button id="courseLogout" class="account-btn hidden" type="button">登出</button>
+    </div>
+  </header>
+
+  <!-- ── 進度列 ────────────────────────────────── -->
+  <div class="course-bar">
+    <div class="course-bar-main">
+      <button class="day-nav" id="prevDay" title="前一天">‹</button>
+      <span class="day-badge" id="dayBadge">Day 1</span>
+      <span class="phase-tag" id="phaseTag"></span>
+      <button class="day-nav" id="nextDay" title="下一天">›</button>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-note"><span id="progressNote"></span></div>
+  </div>
+
+  <main class="container">
+
+    <!-- 沒有英文語音時的警告，由 course.js 決定顯不顯示 -->
+    <p class="notice hidden" id="voiceWarn"></p>
+
+    <section class="tool-box course-box">
+      <h2 class="course-h2">📋 今日課表 <span class="course-sub" id="todayTitle"></span></h2>
+      <p class="scene-note" id="sceneNote"></p>
+      <ul class="slot-list" id="slotList">
+        <li class="slot" data-slot="listen"><span class="slot-time">25 分</span><span class="slot-name">🎧 聽力灌耳</span><span class="slot-check">○</span></li>
+        <li class="slot" data-slot="shadow"><span class="slot-time">30 分</span><span class="slot-name">🗣️ 影子跟讀</span><span class="slot-check">○</span></li>
+        <li class="slot" data-slot="drill"><span class="slot-time">30 分</span><span class="slot-name">🔁 句型拆解</span><span class="slot-check">○</span></li>
+        <li class="slot" data-slot="ai"><span class="slot-time">50 分</span><span class="slot-name">🤖 AI 角色扮演</span><span class="slot-check">○</span></li>
+        <li class="slot" data-slot="rw"><span class="slot-time">25 分</span><span class="slot-name">✍️ 讀寫</span><span class="slot-check">○</span></li>
+        <li class="slot" data-slot="check"><span class="slot-time">10 分</span><span class="slot-name">📝 Daily Check</span><span class="slot-check">○</span></li>
+      </ul>
+    </section>
+
+    <section class="tool-box course-box">
+      <h2 class="course-h2">🎧 今日對話</h2>
+      <div class="dlg-controls">
+        <button class="btn-primary course-btn" id="playAllBtn">▶️ 整段播放</button>
+        <button class="course-btn btn-ghost" id="stopBtn">⏹ 停止</button>
+        <label class="dlg-toggle"><input type="checkbox" id="hideScript" /> 蓋住逐字稿</label>
+      </div>
+      <div class="dlg-speed">
+        <span>語速</span>
+        <input type="range" id="courseSpeed" min="0.5" max="1.5" step="0.1" value="1" />
+        <span id="courseSpeedVal">1.0×</span>
+      </div>
+      <div class="dialogue" id="dialogue"></div>
+
+      <details class="help course-details" id="ctrBox">
+        <summary>💬 口語縮寫提示（母語者實際會這樣講）</summary>
+        <ul class="ctr-list" id="ctrList"></ul>
+        <p class="ctr-note">自己講的時候仍然用完整形式。這一欄是給耳朵認的，不是給嘴巴用的。</p>
+      </details>
+
+      <details class="help course-details" id="fixedBox">
+        <summary>📌 固定說法（整句背，不拆文法）</summary>
+        <ul class="fixed-list" id="fixedList"></ul>
+      </details>
+
+      <details class="help course-details hidden" id="passageBox">
+        <summary>📖 今日短文</summary>
+        <div class="passage-en" id="passageEn"></div>
+        <div class="passage-zh" id="passageZh"></div>
+        <button class="course-btn btn-ghost" id="passageSpeak">🔊 唸一遍</button>
+      </details>
+    </section>
+
+    <section class="tool-box course-box" id="recordingBox">
+      <h2 class="course-h2">影子跟讀錄音 <span class="course-sub">錄完立即回聽比對</span></h2>
+      <p class="course-hint">先播放今日對話，再錄下自己的跟讀。每日錄音只存在這台裝置。</p>
+      <div class="record-actions">
+        <button class="course-btn btn-rec" id="shadowRecordBtn">開始錄音</button>
+        <button class="course-btn btn-ghost" id="shadowStopBtn" disabled>停止</button>
+        <button class="course-btn btn-ghost" id="shadowPlayBtn" disabled>播放錄音</button>
+      </div>
+      <p class="course-hint" id="shadowRecordNote">尚未錄音。</p>
+      <div class="milestone-box hidden" id="milestoneBox">
+        <b id="milestoneTitle"></b>
+        <p class="course-hint">Day 1、35、70、91 都錄同一段自我介紹，才能前後比較。</p>
+        <div class="record-actions">
+          <button class="course-btn btn-rec" id="milestoneRecordBtn">錄里程碑</button>
+          <button class="course-btn btn-ghost" id="milestoneStopBtn" disabled>停止</button>
+          <button class="course-btn btn-ghost" id="milestonePlayBtn" disabled>播放錄音</button>
+        </div>
+        <p class="course-hint" id="milestoneNote">尚未錄音。</p>
+      </div>
+    </section>
+
+    <section class="tool-box course-box">
+      <h2 class="course-h2">🔁 句型替換練習</h2>
+      <div id="drillArea"></div>
+      <p class="course-hint">點一下換字，跟著唸出來。這一段是用嘴巴練的，不是用眼睛看的。</p>
+    </section>
+
+    <section class="tool-box course-box">
+      <h2 class="course-h2">🤖 AI 角色扮演實戰 <span class="course-sub">50 分鐘</span></h2>
+      <p class="course-hint">按「複製指令」，貼到 Claude App 開始對話。講完回來按完成。</p>
+      <div class="ai-prompt-box"><pre id="aiPromptText"></pre></div>
+      <div class="ai-actions">
+        <button class="btn-primary course-btn" id="copyPromptBtn">📋 複製指令</button>
+        <button class="course-btn btn-ghost" id="aiDoneBtn">✅ 我講完了</button>
+      </div>
+    </section>
+
+    <section class="tool-box course-box">
+      <h2 class="course-h2">📝 Daily Check <span class="course-sub">10 分鐘 · 70 分過關</span></h2>
+      <div class="check-part">
+        <h3 class="check-h3">① 聽寫 <span class="check-score">40 分</span></h3>
+        <div id="checkDictation"></div>
+        <p class="course-hint">音檔用母語者的自然縮寫唸。你寫完整形式（I am）也算對。</p>
+      </div>
+      <div class="check-part">
+        <h3 class="check-h3">② 口說錄音 <span class="check-score">30 分</span></h3>
+        <div id="checkSpeaking"></div>
+        <p class="course-hint">先錄音並回聽；確認完成後勾選本題。</p>
+      </div>
+      <div class="check-part">
+        <h3 class="check-h3">③ 單字 <span class="check-score">30 分</span></h3>
+        <div id="checkVocab"></div>
+      </div>
+      <button class="btn-primary course-btn full" id="submitCheckBtn">送出計分</button>
+      <p class="course-hint" id="checkNote">填完三區後送出，70 分以上通過；未滿 70 分要補強當日內容。</p>
+    </section>
+
+    <section class="tool-box course-box hidden" id="exitExamBox">
+      <h2 class="course-h2">階段考成績 <span class="course-sub">75 分才能進下一階段</span></h2>
+      <p class="course-hint" id="exitExamNote"></p>
+      <div class="exam-score-row">
+        <input class="check-input" id="exitExamScore" type="number" min="0" max="100" inputmode="numeric" placeholder="輸入 0～100 分" />
+        <button class="btn-primary course-btn" id="saveExitExamBtn">儲存成績</button>
+      </div>
+      <p class="course-hint" id="exitExamResult"></p>
+    </section>
+
+    <div class="course-foot">
+      <a href="index.html" class="course-btn btn-ghost full">📖 去背單字本</a>
+      <p class="dev-copyright">© 何朋哲 · v1.20.0</p>
+    </div>
+
+  </main>
+
+  <script src="sync.js?v=1.20.0"></script>
+  <script src="speech.js?v=1.20.0"></script>
+  <script src="starter-pack.js"></script>
+  <script src="pack-jhs1.js"></script>
+  <script src="pack-jhs2.js"></script>
+  <script src="pack-jhs3.js"></script>
+  <script src="pack-sent-ph.js"></script>
+  <script src="course-pack.js?v=1.20.0"></script>
+  <script src="course-pack-p2a.js?v=1.20.0"></script>
+  <script src="course-pack-p2b.js?v=1.20.0"></script>
+  <script src="course-pack-p3.js?v=1.20.0"></script>
+  <script src="course-vocab-base.js?v=1.20.0"></script>
+  <script src="course-vocab-extra.js?v=1.20.0"></script>
+  <script src="course-phonetics.js?v=1.20.0"></script>
+  <script src="course-pack-finalize.js?v=1.20.0"></script>
+  <script src="course.js?v=1.20.0"></script>
+</body>
+</html>

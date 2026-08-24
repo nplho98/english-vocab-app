@@ -16,7 +16,7 @@
   "startUrl": "/english-vocab-app/",
   "iconUrl": "https://nplho98.github.io/english-vocab-app/icon-512.png",
   "maskableIconUrl": "https://nplho98.github.io/english-vocab-app/icon-512.png",
-  "appVersion": "1.22.2",
+  "appVersion": "1.22.3",
   "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",

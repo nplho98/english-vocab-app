@@ -142,7 +142,6 @@ function render(day) {
     $("drillArea").innerHTML = "";
     $("aiPromptText").textContent = "";
     $("checkDictation").innerHTML = "";
-    $("checkSpeaking").innerHTML = "";
     $("checkVocab").innerHTML = "";
     $("hideScript").checked = false;
     $("dialogue").classList.remove("hide-script");
@@ -200,11 +199,6 @@ function render(day) {
       <button class="icon-btn speak-btn dict-btn" data-text="${s.replace(/"/g, "&quot;")}">🔊</button>
       <input type="text" class="check-input dictation-answer" data-answer="${encodeURIComponent(s)}" placeholder="聽到什麼就打什麼" />
     </div>`).join("");
-  $("checkSpeaking").innerHTML = (c.speaking || []).map((s, i) => `
-    <div class="check-row"><span class="check-zh">${s}</span>
-    <button class="course-btn btn-rec speaking-record" data-rec-key="speaking-${i}">錄音</button>
-    <button class="course-btn btn-ghost speaking-play" data-rec-key="speaking-${i}" disabled>播放</button>
-    <label class="check-self"><input type="checkbox" class="speaking-done" /> 已完整說出</label></div>`).join("");
   $("checkVocab").innerHTML = (c.vocab || []).map((w) => {
     const word = (d.newWords || []).find((item) => item.t.toLowerCase() === w.toLowerCase());
     const answer = word ? word.zh : "";
@@ -268,13 +262,6 @@ function bindDynamic() {
     });
   });
 
-  document.querySelectorAll(".speaking-record").forEach((btn) => {
-    btn.addEventListener("click", () => toggleSpeakingRecording(btn));
-  });
-  document.querySelectorAll(".speaking-play").forEach((btn) => {
-    btn.addEventListener("click", () => playStoredRecording(recordKey(currentDay, btn.dataset.recKey)));
-    hasStoredRecording(recordKey(currentDay, btn.dataset.recKey)).then((has) => { btn.disabled = !has; });
-  });
 }
 
 function wordInfo(text) {
@@ -431,7 +418,6 @@ $("submitCheckBtn").addEventListener("click", async () => {
   if (!d) return;
   const dictInputs = [...document.querySelectorAll(".dictation-answer")];
   const vocabInputs = [...document.querySelectorAll(".vocab-answer")];
-  const speakingChecks = [...document.querySelectorAll(".speaking-done")];
 
   let dictCorrect = 0;
   dictInputs.forEach((input) => {
@@ -451,11 +437,9 @@ $("submitCheckBtn").addEventListener("click", async () => {
     markAnswer(input, correct, answer);
   });
 
-  const speakingCorrect = speakingChecks.filter((input) => input.checked).length;
-  const dictScore = dictInputs.length ? dictCorrect / dictInputs.length * 40 : 0;
-  const speakingScore = speakingChecks.length ? speakingCorrect / speakingChecks.length * 30 : 0;
-  const vocabScore = vocabInputs.length ? vocabCorrect / vocabInputs.length * 30 : 0;
-  const score = Math.round(dictScore + speakingScore + vocabScore);
+  const dictScore = dictInputs.length ? dictCorrect / dictInputs.length * 50 : 0;
+  const vocabScore = vocabInputs.length ? vocabCorrect / vocabInputs.length * 50 : 0;
+  const score = Math.round(dictScore + vocabScore);
 
   courseState.checkScores[currentDay] = score;
   if (!courseState.completed.includes(currentDay)) courseState.completed.push(currentDay);

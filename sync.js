@@ -24,6 +24,16 @@
     return result;
   }
 
+  function mergeLatestMap(cloud, local, timestampField) {
+    const result = { ...(cloud || {}) };
+    for (const [key, value] of Object.entries(local || {})) {
+      const previous = result[key];
+      result[key] = !previous || Number(value && value[timestampField] || 0) >= Number(previous && previous[timestampField] || 0)
+        ? value : previous;
+    }
+    return result;
+  }
+
   function mergeCourse(cloud, local) {
     const remote = cloud && typeof cloud === "object" ? cloud : {};
     const device = local && typeof local === "object" ? local : {};
@@ -38,6 +48,8 @@
       recordings: { ...(remote.recordings || {}), ...(device.recordings || {}) },
       daySlots: mergeDaySlots(remote.daySlots, device.daySlots),
       injectedDays: unique([...(remote.injectedDays || []), ...(device.injectedDays || [])]).sort((a, b) => a - b),
+      wrongItems: mergeLatestMap(remote.wrongItems, device.wrongItems, "updatedAt"),
+      weeklyAttempts: mergeLatestMap(remote.weeklyAttempts, device.weeklyAttempts, "savedAt"),
     };
   }
 

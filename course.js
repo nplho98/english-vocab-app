@@ -62,6 +62,7 @@ function loadCourseState() {
   const fallback = {
     currentDay, completed: [], checkScores: {}, weeklyScores: {},
     exitExams: {}, blockedAt: null, recordings: {}, daySlots: {}, injectedDays: [],
+    wrongItems: {}, weeklyAttempts: {},
   };
   try {
     const saved = JSON.parse(localStorage.getItem(COURSE_STATE_KEY) || "null");
@@ -73,6 +74,7 @@ function loadCourseState() {
       exitExams: saved.exitExams || {}, recordings: saved.recordings || {},
       daySlots: saved.daySlots || {},
       injectedDays: Array.isArray(saved.injectedDays) ? saved.injectedDays : [],
+      wrongItems: saved.wrongItems || {}, weeklyAttempts: saved.weeklyAttempts || {},
     };
   } catch { return fallback; }
 }
@@ -109,6 +111,109 @@ function dayData(day) {
   return COURSE_PACK.find((d) => d.day === day) || null;
 }
 
+function reviewItemKey(type, prompt) {
+  return `${type}:${normalizeEnglish(prompt)}`;
+}
+
+function reviewItemsBetween(firstDay, lastDay) {
+  const items = [];
+  for (const lesson of COURSE_PACK) {
+    if (lesson.day < firstDay || lesson.day > lastDay) continue;
+    const vocab = (lesson.check && lesson.check.vocab) || [];
+    for (const prompt of vocab) {
+      const word = (lesson.newWords || []).find((entry) => entry.t.toLowerCase() === prompt.toLowerCase()) || wordInfo(prompt);
+      if (word && word.zh) items.push({ type: "vocab", prompt, answer: word.zh, sourceDay: lesson.day });
+    }
+    for (const sentence of ((lesson.check && lesson.check.dictation) || [])) {
+      items.push({ type: "dictation", prompt: sentence, answer: sentence, sourceDay: lesson.day });
+    }
+  }
+  const unique = new Map();
+  for (const item of items) if (!unique.has(reviewItemKey(item.type, item.prompt))) unique.set(reviewItemKey(item.type, item.prompt), item);
+  return [...unique.values()];
+}
+
+function spreadPick(items, count, seed) {
+  if (!items.length || count <= 0) return [];
+  const start = Math.abs(seed * 17) % items.length;
+  const rotated = [...items.slice(start), ...items.slice(0, start)];
+  return rotated.slice(0, Math.min(count, rotated.length));
+}
+
+function weeklyQuizFor(day) {
+  const weekStart = Math.max(1, day - 6);
+  const selected = [];
+  const keys = new Set();
+  const add = (item) => {
+    if (!item) return;
+    const key = reviewItemKey(item.type, item.prompt);
+    if (!keys.has(key)) { keys.add(key); selected.push(item); }
+  };
+  spreadPick(reviewItemsBetween(weekStart, day), 7, day).forEach(add);
+  const oldWrong = Object.values(courseState.wrongItems || {})
+    .filter((item) => !item.resolvedDay && Number(item.sourceDay) < weekStart)
+    .sort((a, b) => Number(b.wrongCount || 0) - Number(a.wrongCount || 0) || Number(b.lastWrongDay || 0) - Number(a.lastWrongDay || 0));
+  oldWrong.slice(0, 2).forEach(add);
+  spreadPick(reviewItemsBetween(1, weekStart - 1).filter((item) => !keys.has(reviewItemKey(item.type, item.prompt))), 1, day + 3).forEach(add);
+  for (const item of reviewItemsBetween(1, day)) {
+    if (selected.length >= 10) break;
+    add(item);
+  }
+  return selected.slice(0, 10);
+}
+
+function recordReviewResult(item, correct, day) {
+  const key = reviewItemKey(item.type, item.prompt);
+  const old = courseState.wrongItems[key];
+  if (!correct) {
+    courseState.wrongItems[key] = {
+      type: item.type, prompt: item.prompt, answer: item.answer, sourceDay: item.sourceDay,
+      wrongCount: Number(old && old.wrongCount || 0) + 1, lastWrongDay: day, resolvedDay: null, updatedAt: Date.now(),
+    };
+  } else if (old) {
+    courseState.wrongItems[key] = { ...old, resolvedDay: day, updatedAt: Date.now() };
+  }
+}
+
+function renderWeeklyReview(day) {
+  const box = $("weeklyReviewBox");
+  const isReviewDay = day % 7 === 0;
+  box.classList.toggle("hidden", !isReviewDay);
+  if (!isReviewDay) return;
+  const weekStart = Math.max(1, day - 6);
+  const scores = [];
+  for (let value = weekStart; value <= day; value += 1) {
+    const score = Number(courseState.checkScores[value]);
+    if (Number.isFinite(score)) scores.push(score);
+  }
+  const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
+  const unresolved = Object.values(courseState.wrongItems || {}).filter((item) => !item.resolvedDay && Number(item.sourceDay) <= day);
+  const resolved = Object.values(courseState.wrongItems || {}).filter((item) => Number(item.resolvedDay) >= weekStart && Number(item.resolvedDay) <= day);
+  $("weeklyReviewRange").textContent = `Day 1～${day}`;
+  $("weeklySummary").innerHTML = `
+    <div><b>${scores.length}</b><span>本週已測天數</span></div>
+    <div><b>${average === null ? "—" : average}</b><span>本週平均分</span></div>
+    <div><b>${unresolved.length}</b><span>待補強錯題</span></div>
+    <div><b>${resolved.length}</b><span>本週已修正</span></div>`;
+  const reviewWords = reviewItemsBetween(weekStart, day).filter((item) => item.type === "vocab").slice(0, 14);
+  $("weeklyReviewList").innerHTML = reviewWords.length
+    ? reviewWords.map((item) => `<div class="weekly-review-item"><b>${item.prompt}</b><span>${item.answer}</span><small>Day ${item.sourceDay}</small></div>`).join("")
+    : `<p class="course-hint">本週沒有新增核心單字，請複習對話與舊錯題。</p>`;
+  const quiz = weeklyQuizFor(day);
+  $("weeklyQuiz").innerHTML = quiz.map((item, index) => item.type === "dictation"
+    ? `<div class="check-row weekly-question" data-type="${item.type}" data-prompt="${encodeURIComponent(item.prompt)}" data-answer="${encodeURIComponent(item.answer)}" data-day="${item.sourceDay}"><button class="icon-btn weekly-listen" type="button">🔊</button><input class="check-input weekly-answer" placeholder="輸入聽到的英文" /></div>`
+    : `<div class="check-row weekly-question" data-type="${item.type}" data-prompt="${encodeURIComponent(item.prompt)}" data-answer="${encodeURIComponent(item.answer)}" data-day="${item.sourceDay}"><span class="check-zh">${index + 1}. ${item.prompt}</span><input class="check-input weekly-answer" placeholder="中文" /></div>`).join("");
+  document.querySelectorAll(".weekly-listen").forEach((button) => button.addEventListener("click", () => {
+    const row = button.closest(".weekly-question");
+    speakAsync(contract(decodeURIComponent(row.dataset.prompt)), getEnVoice(), "en-US");
+  }));
+  const saved = courseState.weeklyScores[day];
+  $("weeklyResult").className = "course-hint";
+  $("weeklyResult").textContent = Number.isFinite(Number(saved))
+    ? `上次累積週考：${saved} 分。重新送出會更新紀錄。`
+    : `題目來源：本週 70%、歷史錯題 20%、舊內容抽查 10%；舊錯題不足時由累積內容補足。`;
+}
+
 // ---------- 渲染 ----------
 const $ = (id) => document.getElementById(id);
 
@@ -123,6 +228,7 @@ function render(day) {
   $("nextDay").disabled = day >= TOTAL_DAYS;
   renderExitExam(day);
   renderSlotProgress(day);
+  renderWeeklyReview(day);
 
   if (!d) {
     // 內容還沒做到這一天
@@ -551,6 +657,7 @@ $("submitCheckBtn").addEventListener("click", async () => {
     const correct = normalizeEnglish(input.value) === normalizeEnglish(answer);
     if (correct) dictCorrect++;
     markAnswer(input, correct, answer);
+    recordReviewResult({ type: "dictation", prompt: answer, answer, sourceDay: currentDay }, correct, currentDay);
   });
 
   let vocabCorrect = 0;
@@ -561,6 +668,8 @@ $("submitCheckBtn").addEventListener("click", async () => {
     const correct = !!given && expected.some((item) => given === item);
     if (correct) vocabCorrect++;
     markAnswer(input, correct, answer);
+    const prompt = input.closest(".check-row").querySelector(".check-zh").textContent.trim();
+    recordReviewResult({ type: "vocab", prompt, answer, sourceDay: currentDay }, correct, currentDay);
   });
 
   const dictScore = dictInputs.length ? dictCorrect / dictInputs.length * 50 : 0;
@@ -579,6 +688,39 @@ $("submitCheckBtn").addEventListener("click", async () => {
   $("checkNote").textContent = passed
     ? `本次 ${score} 分，Daily Check 通過，進度已儲存${addedWords ? `，並加入 ${addedWords} 個新字` : ""}。`
     : `本次 ${score} 分，未達 70 分。進度已儲存${addedWords ? `，並加入 ${addedWords} 個新字` : ""}；請補強今天內容後再測一次。`;
+});
+
+$("submitWeeklyBtn").addEventListener("click", () => {
+  if (currentDay % 7 !== 0) return;
+  const rows = [...document.querySelectorAll(".weekly-question")];
+  if (!rows.length) return;
+  let correctCount = 0;
+  const details = [];
+  for (const row of rows) {
+    const item = {
+      type: row.dataset.type,
+      prompt: decodeURIComponent(row.dataset.prompt || ""),
+      answer: decodeURIComponent(row.dataset.answer || ""),
+      sourceDay: Number(row.dataset.day) || currentDay,
+    };
+    const input = row.querySelector(".weekly-answer");
+    const given = input.value.trim();
+    const correct = item.type === "dictation"
+      ? normalizeEnglish(given) === normalizeEnglish(item.answer)
+      : !!given && chineseAnswers(item.answer).some((answer) => given.replace(/\s+/g, "").toLowerCase() === answer);
+    if (correct) correctCount += 1;
+    markAnswer(input, correct, item.answer);
+    recordReviewResult(item, correct, currentDay);
+    details.push({ key: reviewItemKey(item.type, item.prompt), correct });
+  }
+  const score = Math.round(correctCount / rows.length * 100);
+  courseState.weeklyScores[currentDay] = score;
+  courseState.weeklyAttempts[currentDay] = { score, correct: correctCount, total: rows.length, details, savedAt: Date.now() };
+  saveCourseState();
+  $("weeklyResult").className = `check-result ${score >= 70 ? "pass" : "fail"}`;
+  $("weeklyResult").textContent = score >= 70
+    ? `累積週考 ${score} 分，答對 ${correctCount}/${rows.length} 題；錯題與修正紀錄已儲存。`
+    : `累積週考 ${score} 分，答對 ${correctCount}/${rows.length} 題；未熟內容已加入下一次累積複習。`;
 });
 
 // ---------- P4：階段考 75 分擋關 ----------

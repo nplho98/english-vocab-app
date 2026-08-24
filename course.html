@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <title>我不要再當英文小白</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="course.css" />
+  <link rel="stylesheet" href="course.css?v=1.24.0" />
 </head>
 <body>
   <header class="app-header">
@@ -42,6 +42,18 @@
     <section class="tool-box course-box">
       <h2 class="course-h2">📋 今日課表 <span class="course-sub" id="todayTitle"></span></h2>
       <p class="scene-note" id="sceneNote"></p>
+    </section>
+
+    <section class="tool-box course-box hidden" id="weeklyReviewBox">
+      <h2 class="course-h2">本週累積複習 <span class="course-sub" id="weeklyReviewRange"></span></h2>
+      <div class="weekly-summary" id="weeklySummary"></div>
+      <h3 class="check-h3">考前重點</h3>
+      <div class="weekly-review-list" id="weeklyReviewList"></div>
+      <h3 class="check-h3">累積週考 <span class="check-score">10 題</span></h3>
+      <p class="course-hint">本週內容為主，並抽查舊錯題與更早學過的內容。</p>
+      <div id="weeklyQuiz"></div>
+      <button class="btn-primary course-btn full" id="submitWeeklyBtn">送出週考</button>
+      <p class="course-hint" id="weeklyResult"></p>
     </section>
 
     <section class="tool-box course-box">
@@ -129,12 +141,12 @@
 
     <div class="course-foot">
       <a href="index.html" class="course-btn btn-ghost full">📖 去背單字本</a>
-      <p class="dev-copyright">© 何朋哲 · v1.23.1</p>
+      <p class="dev-copyright">© 何朋哲 · v1.24.0</p>
     </div>
 
   </main>
 
-  <script src="sync.js?v=1.20.0"></script>
+  <script src="sync.js?v=1.24.0"></script>
   <script src="speech.js?v=1.20.0"></script>
   <script src="starter-pack.js"></script>
   <script src="pack-jhs1.js"></script>
@@ -150,6 +162,6 @@
   <script src="course-phonetics.js?v=1.20.0"></script>
   <script src="course-pack-finalize.js?v=1.20.0"></script>
   <script src="course-word-groups.js?v=1.23.0"></script>
-  <script src="course.js?v=1.23.1"></script>
+  <script src="course.js?v=1.24.0"></script>
 </body>
 </html>

@@ -142,6 +142,26 @@
 .ai-actions { display: flex; gap: 8px; }
 
 /* ---- Daily Check ---- */
+.weekly-summary {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px;
+}
+.weekly-summary > div {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 6px; text-align: center;
+}
+.weekly-summary b { display: block; color: var(--blue-dark); font-size: 1.2rem; }
+.weekly-summary span { display: block; color: var(--muted); font-size: 0.7rem; margin-top: 3px; }
+.weekly-review-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 16px;
+}
+.weekly-review-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+}
+.weekly-review-item b { font-size: 0.9rem; }
+.weekly-review-item span { color: var(--muted); font-size: 0.82rem; text-align: right; }
+.weekly-review-item small { grid-column: 1 / -1; color: var(--muted); font-size: 0.68rem; }
+
 .check-part { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .check-h3 { font-size: 0.88rem; margin-bottom: 8px; }
 .check-score { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
@@ -211,4 +231,9 @@
 #voiceWarn {
   background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
   border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; line-height: 1.7; margin-bottom: 14px;
+}
+
+@media (max-width: 520px) {
+  .weekly-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .weekly-review-list { grid-template-columns: 1fr; }
 }

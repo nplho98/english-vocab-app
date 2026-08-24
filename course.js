@@ -276,6 +276,7 @@ function wordInfo(text) {
 function renderTodayWords(d) {
   const core = new Set(((d.check && d.check.vocab) || []).map((word) => word.toLowerCase()));
   const words = (d.newWords || []).filter((word) => core.has(word.t.toLowerCase()));
+  $("exportWordsBtn").disabled = !words.length;
   $("todayWordList").innerHTML = words.length ? words.map((word) => {
     const line = d.dialogue[Number.isInteger(word.from) ? word.from : 0];
     return `<article class="today-word-card">
@@ -298,6 +299,131 @@ function renderTodayWords(d) {
       return `<details class="word-group-card"><summary>${group.label}</summary><ul class="related-word-list">${chips}</ul></details>`;
     }).join("")
     : `<p class="course-hint">本日沒有新增的同類字群。</p>`;
+}
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const words = String(text || "").split(/\s+/).filter(Boolean).flatMap((word) => {
+    if (ctx.measureText(word).width <= maxWidth) return [word];
+    const parts = [];
+    let part = "";
+    for (const char of Array.from(word)) {
+      if (part && ctx.measureText(part + char).width > maxWidth) { parts.push(part); part = char; }
+      else part += char;
+    }
+    if (part) parts.push(part);
+    return parts;
+  });
+  if (!words.length) return [""];
+  const lines = [];
+  let line = words.shift();
+  for (const word of words) {
+    const next = `${line} ${word}`;
+    if (ctx.measureText(next).width <= maxWidth) line = next;
+    else { lines.push(line); line = word; }
+  }
+  lines.push(line);
+  return lines;
+}
+
+async function exportTodayWordsImage() {
+  const d = dayData(currentDay);
+  if (!d) return;
+  const core = new Set(((d.check && d.check.vocab) || []).map((word) => word.toLowerCase()));
+  const words = (d.newWords || []).filter((word) => core.has(word.t.toLowerCase()));
+  if (!words.length) return;
+
+  const btn = $("exportWordsBtn");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "圖片製作中";
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const scale = 2;
+    const width = 1080;
+    const outer = 18;
+    const gap = 18;
+    const cardWidth = (width - outer * 2 - gap) / 2;
+    const inner = 20;
+    const contentWidth = cardWidth - inner * 2;
+    const probe = document.createElement("canvas").getContext("2d");
+    const cards = words.map((word) => {
+      const dialogueLine = d.dialogue[Number.isInteger(word.from) ? word.from : 0];
+      probe.font = "22px Arial, sans-serif";
+      const exampleLines = wrapCanvasText(probe, dialogueLine ? dialogueLine.en : "", contentWidth);
+      probe.font = "700 26px Arial, 'Microsoft JhengHei', sans-serif";
+      const zhLines = wrapCanvasText(probe, word.zh, contentWidth);
+      return { word, zhLines, exampleLines, height: 20 + 36 + 14 + zhLines.length * 34 + 12 + exampleLines.length * 30 + 18 };
+    });
+
+    const rowHeights = [];
+    for (let i = 0; i < cards.length; i += 2) rowHeights.push(Math.max(cards[i].height, cards[i + 1] ? cards[i + 1].height : 0));
+    const height = outer * 2 + rowHeights.reduce((sum, value) => sum + value, 0) + gap * Math.max(0, rowHeights.length - 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#e7edf5";
+    ctx.fillRect(0, 0, width, height);
+
+    let y = outer;
+    for (let row = 0; row < rowHeights.length; row += 1) {
+      const cardHeight = rowHeights[row];
+      for (let col = 0; col < 2; col += 1) {
+        const card = cards[row * 2 + col];
+        if (!card) continue;
+        const x = outer + col * (cardWidth + gap);
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.roundRect(x, y, cardWidth, cardHeight, 16);
+        ctx.fill();
+
+        let textY = y + 42;
+        ctx.fillStyle = "#2563eb";
+        ctx.font = "700 30px Arial, sans-serif";
+        ctx.fillText(card.word.t, x + inner, textY);
+        const wordWidth = ctx.measureText(card.word.t).width;
+        ctx.fillStyle = "#64748b";
+        ctx.font = "22px Arial, sans-serif";
+        ctx.fillText(card.word.ph || "", x + inner + wordWidth + 13, textY);
+        textY += 51;
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "700 26px Arial, 'Microsoft JhengHei', sans-serif";
+        for (const line of card.zhLines) {
+          ctx.fillText(line, x + inner, textY);
+          textY += 34;
+        }
+        textY += 9;
+        ctx.fillStyle = "#64748b";
+        ctx.font = "22px Arial, sans-serif";
+        for (const line of card.exampleLines) {
+          ctx.fillText(line, x + inner, textY);
+          textY += 30;
+        }
+      }
+      y += cardHeight + gap;
+    }
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("PNG 產生失敗");
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Day${String(currentDay).padStart(2, "0")}_今日對話單字.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    btn.textContent = "圖片已輸出";
+  } catch (error) {
+    console.error(error);
+    btn.textContent = "輸出失敗";
+  } finally {
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 1800);
+  }
 }
 
 // 把完整形式轉成母語者的自然縮寫（只用在聽寫音檔，畫面上的字不動）
@@ -708,6 +834,8 @@ $("aiDoneBtn").addEventListener("click", () => {
   markSlotDone("ai");
   $("aiDoneBtn").textContent = "已完成";
 });
+
+$("exportWordsBtn").addEventListener("click", exportTodayWordsImage);
 
 // ---------- 啟動 ----------
 setVoicesReadyCallback(() => { pickVoicePair(); checkVoiceAvailability(); });

@@ -51,6 +51,10 @@
 .slot.done .slot-name { color: var(--muted); text-decoration: line-through; }
 
 /* ---- 今日對話單字與同類字群 ---- */
+.course-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.course-section-head .course-h2 { margin-bottom: 0; }
+.export-words-btn { flex: 0 0 auto; padding: 7px 11px; font-size: 0.78rem; }
+.export-words-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .today-word-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
 .today-word-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--card); }
 .today-word-main { display: flex; align-items: center; gap: 8px; }

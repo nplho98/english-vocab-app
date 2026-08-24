@@ -10,7 +10,7 @@ function read(name) { return fs.readFileSync(path.join(root, name), "utf8"); }
 const files = ["index.html", "course.html", "app.js", "course.js", "course-word-groups.js", "sync.js", "sw.js"];
 for (const file of files) if (!fs.existsSync(path.join(root, file))) fail(`缺少 ${file}`);
 
-const version = "1.23.0";
+const version = "1.23.1";
 for (const file of ["index.html", "course.html", "sw.js"]) {
   if (!read(file).includes(version)) fail(`${file} 版本號不是 ${version}`);
 }
@@ -29,7 +29,7 @@ else {
 
 const courseHtml = read("course.html");
 const indexHtml = read("index.html");
-for (const id of ["todayWordList", "relatedWordGroups"]) {
+for (const id of ["todayWordList", "relatedWordGroups", "exportWordsBtn"]) {
   if (!courseHtml.includes(`id="${id}"`)) fail(`課程頁缺少 #${id}`);
 }
 if (!(courseHtml.indexOf("🎧 今日對話") < courseHtml.indexOf('id="todayWordsBox"') &&
@@ -37,6 +37,7 @@ if (!(courseHtml.indexOf("🎧 今日對話") < courseHtml.indexOf('id="todayWor
   fail("章節順序必須是今日對話 → 今日對話單字 → 句型替換練習");
 }
 if (!read("course.js").includes("renderTodayWords")) fail("課程程式缺少每日單字渲染");
+if (!read("course.js").includes("exportTodayWordsImage")) fail("課程程式缺少每日單字圖片輸出");
 if (courseHtml.includes("checkSpeaking") || courseHtml.includes("口說錄音")) fail("Daily Check 仍含口說錄音區塊");
 if (!courseHtml.includes("① 聽寫") || !courseHtml.includes("50 分") || !courseHtml.includes("② 單字")) fail("Daily Check 配分不是聽寫 50／單字 50");
 for (const id of ["courseAccountStatus", "courseGoogleLogin", "courseLogout"]) {

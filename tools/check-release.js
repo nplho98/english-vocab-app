@@ -7,10 +7,10 @@ let failures = 0;
 function fail(message) { console.error(`BAD  ${message}`); failures++; }
 function read(name) { return fs.readFileSync(path.join(root, name), "utf8"); }
 
-const files = ["index.html", "course.html", "app.js", "course.js", "sync.js", "sw.js"];
+const files = ["index.html", "course.html", "app.js", "course.js", "course-word-groups.js", "sync.js", "sw.js"];
 for (const file of files) if (!fs.existsSync(path.join(root, file))) fail(`缺少 ${file}`);
 
-const version = "1.21.2";
+const version = "1.22.0";
 for (const file of ["index.html", "course.html", "sw.js"]) {
   if (!read(file).includes(version)) fail(`${file} 版本號不是 ${version}`);
 }
@@ -29,6 +29,10 @@ else {
 
 const courseHtml = read("course.html");
 const indexHtml = read("index.html");
+for (const id of ["todayWordList", "relatedWordGroups"]) {
+  if (!courseHtml.includes(`id="${id}"`)) fail(`課程頁缺少 #${id}`);
+}
+if (!read("course.js").includes("renderTodayWords")) fail("課程程式缺少每日單字渲染");
 for (const id of ["courseAccountStatus", "courseGoogleLogin", "courseLogout"]) {
   if (!courseHtml.includes(`id="${id}"`)) fail(`課程頁缺少 #${id}`);
 }

@@ -130,6 +130,8 @@ function render(day) {
     $("todayTitle").textContent = "";
     $("sceneNote").textContent = `Day ${day} 的內容還沒做。目前已完成 Day ${Math.min(...made)}–${Math.max(...made)}。`;
     $("dialogue").innerHTML = "";
+    $("todayWordList").innerHTML = "";
+    $("relatedWordGroups").innerHTML = "";
     $("ctrBox").classList.add("hidden");
     $("ctrList").innerHTML = "";
     $("fixedBox").classList.add("hidden");
@@ -159,6 +161,8 @@ function render(day) {
       <span class="dlg-en">${l.en}</span>
       <button class="icon-btn speak-btn" title="唸這句">🔊</button>
     </div>`).join("");
+
+  renderTodayWords(d);
 
   // 縮寫提示
   const ctr = d.contractions || [];
@@ -224,6 +228,9 @@ function render(day) {
 
 // ---------- 動態內容的事件（每次 render 後重綁）----------
 function bindDynamic() {
+  document.querySelectorAll(".word-speak-btn").forEach((btn) => {
+    btn.addEventListener("click", () => speak(btn.dataset.word));
+  });
   document.querySelectorAll(".dlg-line .speak-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -268,6 +275,42 @@ function bindDynamic() {
     btn.addEventListener("click", () => playStoredRecording(recordKey(currentDay, btn.dataset.recKey)));
     hasStoredRecording(recordKey(currentDay, btn.dataset.recKey)).then((has) => { btn.disabled = !has; });
   });
+}
+
+function wordInfo(text) {
+  const key = String(text || "").toLowerCase();
+  for (const lesson of COURSE_PACK) {
+    const found = (lesson.newWords || []).find((word) => word.t.toLowerCase() === key);
+    if (found) return found;
+  }
+  return null;
+}
+
+function renderTodayWords(d) {
+  const core = new Set(((d.check && d.check.vocab) || []).map((word) => word.toLowerCase()));
+  const words = (d.newWords || []).filter((word) => core.has(word.t.toLowerCase()));
+  $("todayWordList").innerHTML = words.length ? words.map((word) => {
+    const line = d.dialogue[Number.isInteger(word.from) ? word.from : 0];
+    return `<article class="today-word-card">
+      <div class="today-word-main"><b>${word.t}</b><span>${word.ph || ""}</span><button class="icon-btn word-speak-btn" data-word="${word.t}" title="播放單字">🔊</button></div>
+      <div class="today-word-zh">${word.zh}</div>
+      <div class="today-word-example">${line ? line.en : ""}</div>
+    </article>`;
+  }).join("") : `<p class="course-hint">本日是綜合複習，不新增核心單字。</p>`;
+
+  const groupIds = (typeof COURSE_DAY_WORD_GROUPS === "object" && COURSE_DAY_WORD_GROUPS[d.day]) || [];
+  $("relatedWordGroups").innerHTML = groupIds.length
+    ? `<h3 class="word-group-heading">同類單字提醒</h3>` + groupIds.map((id) => {
+      const group = COURSE_WORD_GROUPS[id];
+      const chips = group.words.map(([text, zh, firstDay]) => {
+        const state = firstDay === d.day ? "today" : firstDay < d.day ? "learned" : "future";
+        const note = state === "today" ? "今天" : state === "learned" ? `Day ${firstDay} 已學` : `Day ${firstDay} 學`;
+        const info = wordInfo(text);
+        return `<span class="related-word-chip ${state}" title="${zh}"><b>${text}</b><small>${zh} · ${note}</small>${info && info.ph ? `<em>${info.ph}</em>` : ""}</span>`;
+      }).join("");
+      return `<details class="word-group-card"><summary>${group.label}</summary><div class="related-word-chips">${chips}</div></details>`;
+    }).join("")
+    : `<p class="course-hint">本日沒有新增的同類字群。</p>`;
 }
 
 // 把完整形式轉成母語者的自然縮寫（只用在聽寫音檔，畫面上的字不動）

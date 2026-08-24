@@ -50,6 +50,24 @@
 .slot.done .slot-check { color: var(--ok-strong); }
 .slot.done .slot-name { color: var(--muted); text-decoration: line-through; }
 
+/* ---- 今日對話單字與同類字群 ---- */
+.today-word-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
+.today-word-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--card); }
+.today-word-main { display: flex; align-items: center; gap: 8px; }
+.today-word-main b { color: var(--blue); font-size: 1.05rem; }
+.today-word-main span { color: var(--muted); font-size: 0.82rem; flex: 1; }
+.today-word-zh { margin-top: 4px; font-weight: 600; }
+.today-word-example { margin-top: 6px; color: var(--muted); font-size: 0.82rem; line-height: 1.45; }
+.word-group-heading { margin: 14px 0 7px; font-size: 0.92rem; }
+.word-group-card { border-top: 1px solid var(--border); padding: 8px 0; }
+.word-group-card summary { cursor: pointer; font-weight: 700; }
+.related-word-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+.related-word-chip { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; background: var(--card); }
+.related-word-chip small, .related-word-chip em { color: var(--muted); font-size: 0.68rem; font-style: normal; }
+.related-word-chip.today { border-color: var(--blue); background: var(--blue-soft); }
+.related-word-chip.learned { border-color: var(--ok-strong); }
+.related-word-chip.future { opacity: 0.68; }
+
 /* ---- 對話 ---- */
 .dlg-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .dlg-toggle { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }

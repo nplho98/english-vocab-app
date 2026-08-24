@@ -10,7 +10,7 @@ function read(name) { return fs.readFileSync(path.join(root, name), "utf8"); }
 const files = ["index.html", "course.html", "app.js", "course.js", "course-word-groups.js", "sync.js", "sw.js"];
 for (const file of files) if (!fs.existsSync(path.join(root, file))) fail(`缺少 ${file}`);
 
-const version = "1.22.1";
+const version = "1.22.2";
 for (const file of ["index.html", "course.html", "sw.js"]) {
   if (!read(file).includes(version)) fail(`${file} 版本號不是 ${version}`);
 }
@@ -31,6 +31,10 @@ const courseHtml = read("course.html");
 const indexHtml = read("index.html");
 for (const id of ["todayWordList", "relatedWordGroups"]) {
   if (!courseHtml.includes(`id="${id}"`)) fail(`課程頁缺少 #${id}`);
+}
+if (!(courseHtml.indexOf("🎧 今日對話") < courseHtml.indexOf('id="todayWordsBox"') &&
+      courseHtml.indexOf('id="todayWordsBox"') < courseHtml.indexOf("🔁 句型替換練習"))) {
+  fail("章節順序必須是今日對話 → 今日對話單字 → 句型替換練習");
 }
 if (!read("course.js").includes("renderTodayWords")) fail("課程程式缺少每日單字渲染");
 for (const id of ["courseAccountStatus", "courseGoogleLogin", "courseLogout"]) {

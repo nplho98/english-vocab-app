@@ -221,6 +221,22 @@
   font-size: 1.1rem; line-height: 1; cursor: pointer; color: var(--text);
 }
 .day-nav:disabled { opacity: 0.35; cursor: default; }
+.day-nav.locked { opacity: 0.45; }
+.day-jump {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 7px;
+  font-size: 0.8rem; font-weight: 700;
+}
+.day-jump input {
+  width: 42px; border: 0; outline: 0; background: transparent; color: var(--text);
+  font: inherit; text-align: center; appearance: textfield;
+}
+.day-jump input::-webkit-inner-spin-button { appearance: none; }
+.day-go {
+  border: 0; border-radius: 7px; padding: 6px 9px; background: var(--blue); color: #fff;
+  font-size: 0.76rem; font-weight: 700; cursor: pointer;
+}
+.nav-note { min-height: 1.1em; color: var(--warn-text); }
 .course-bar-main .phase-tag { flex: 1; }
 
 /* ---- 短文 ---- */

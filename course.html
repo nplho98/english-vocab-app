@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <title>我不要再當英文小白</title>
   <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="course.css?v=1.24.0" />
+  <link rel="stylesheet" href="course.css?v=1.25.0" />
 </head>
 <body>
   <header class="app-header">
@@ -26,12 +26,15 @@
   <div class="course-bar">
     <div class="course-bar-main">
       <button class="day-nav" id="prevDay" title="前一天">‹</button>
-      <span class="day-badge" id="dayBadge">Day 1</span>
+      <label class="day-jump"><span>Day</span><input id="dayJumpInput" type="number" min="1" max="91" inputmode="numeric" value="1" aria-label="輸入課程天數" /></label>
+      <button class="day-go" id="dayJumpBtn" type="button">前往</button>
+      <span class="day-badge hidden" id="dayBadge">Day 1</span>
       <span class="phase-tag" id="phaseTag"></span>
       <button class="day-nav" id="nextDay" title="下一天">›</button>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
     <div class="progress-note"><span id="progressNote"></span></div>
+    <div class="progress-note nav-note" id="navNote"></div>
   </div>
 
   <main class="container">
@@ -115,7 +118,7 @@
     </section>
 
     <section class="tool-box course-box">
-      <h2 class="course-h2">📝 Daily Check <span class="course-sub">10 分鐘 · 70 分過關</span></h2>
+      <h2 class="course-h2">📝 Daily Check <span class="course-sub">10 分鐘 · 一般日 100 分過關</span></h2>
       <div class="check-part">
         <h3 class="check-h3">① 聽寫 <span class="check-score">50 分</span></h3>
         <div id="checkDictation"></div>
@@ -126,11 +129,11 @@
         <div id="checkVocab"></div>
       </div>
       <button class="btn-primary course-btn full" id="submitCheckBtn">送出計分</button>
-      <p class="course-hint" id="checkNote">填完兩區後送出，70 分以上通過；未滿 70 分要補強當日內容。</p>
+      <p class="course-hint" id="checkNote">一般日必須 100 分才能進入下一天。</p>
     </section>
 
     <section class="tool-box course-box hidden" id="exitExamBox">
-      <h2 class="course-h2">階段考成績 <span class="course-sub">75 分才能進下一階段</span></h2>
+      <h2 class="course-h2">階段考成績 <span class="course-sub">80 分才能進下一階段</span></h2>
       <p class="course-hint" id="exitExamNote"></p>
       <div class="exam-score-row">
         <input class="check-input" id="exitExamScore" type="number" min="0" max="100" inputmode="numeric" placeholder="輸入 0～100 分" />
@@ -141,12 +144,12 @@
 
     <div class="course-foot">
       <a href="index.html" class="course-btn btn-ghost full">📖 去背單字本</a>
-      <p class="dev-copyright">© 何朋哲 · v1.24.0</p>
+      <p class="dev-copyright">© 何朋哲 · v1.25.0</p>
     </div>
 
   </main>
 
-  <script src="sync.js?v=1.24.0"></script>
+  <script src="sync.js?v=1.25.0"></script>
   <script src="speech.js?v=1.20.0"></script>
   <script src="starter-pack.js"></script>
   <script src="pack-jhs1.js"></script>
@@ -162,6 +165,6 @@
   <script src="course-phonetics.js?v=1.20.0"></script>
   <script src="course-pack-finalize.js?v=1.20.0"></script>
   <script src="course-word-groups.js?v=1.23.0"></script>
-  <script src="course.js?v=1.24.0"></script>
+  <script src="course.js?v=1.25.0"></script>
 </body>
 </html>

@@ -62,7 +62,7 @@ function loadCourseState() {
   const fallback = {
     currentDay, completed: [], checkScores: {}, weeklyScores: {},
     exitExams: {}, blockedAt: null, recordings: {}, daySlots: {}, injectedDays: [],
-    wrongItems: {}, weeklyAttempts: {},
+    wrongItems: {}, weeklyAttempts: {}, nextLearningDay: 1, highestReachedDay: 1, courseCompleted: false,
   };
   try {
     const saved = JSON.parse(localStorage.getItem(COURSE_STATE_KEY) || "null");
@@ -80,20 +80,42 @@ function loadCourseState() {
 }
 
 let courseState = loadCourseState();
-currentDay = Math.min(TOTAL_DAYS, Math.max(1, parseInt(courseState.currentDay, 10) || currentDay));
 
-function gateForDay(day) {
-  if (day > 70 && !(Number(courseState.exitExams[2]) >= 75)) return 70;
-  if (day > 35 && !(Number(courseState.exitExams[1]) >= 75)) return 35;
-  return null;
+const PHASE_EXAM_BY_DAY = { 35: 1, 70: 2, 91: 3 };
+function isWeeklyExamDay(day) { return day % 7 === 0 && !PHASE_EXAM_BY_DAY[day]; }
+function requiredScoreForDay(day) { return day % 7 === 0 ? 80 : 100; }
+function savedScoreForDay(day) {
+  if (PHASE_EXAM_BY_DAY[day]) return Number(courseState.exitExams[PHASE_EXAM_BY_DAY[day]]);
+  if (isWeeklyExamDay(day)) return Number(courseState.weeklyScores[day]);
+  return Number(courseState.checkScores[day]);
+}
+function isDayPassed(day) {
+  const score = savedScoreForDay(day);
+  return Number.isFinite(score) && score >= requiredScoreForDay(day);
+}
+function refreshProgressState() {
+  const passed = [];
+  for (let day = 1; day <= TOTAL_DAYS; day += 1) if (isDayPassed(day)) passed.push(day);
+  let next = 1;
+  while (next <= TOTAL_DAYS && isDayPassed(next)) next += 1;
+  const finished = next > TOTAL_DAYS;
+  courseState.completed = passed;
+  courseState.nextLearningDay = finished ? TOTAL_DAYS : next;
+  courseState.highestReachedDay = courseState.nextLearningDay;
+  courseState.courseCompleted = finished;
+  courseState.currentDay = courseState.nextLearningDay;
 }
 
-const initialGate = gateForDay(currentDay);
-if (initialGate) currentDay = initialGate;
+refreshProgressState();
+currentDay = courseState.nextLearningDay;
+
+function gateForDay(day) {
+  return day > courseState.nextLearningDay ? courseState.nextLearningDay : null;
+}
 
 function saveCourseState() {
-  courseState.currentDay = currentDay;
-  localStorage.setItem("course_day", currentDay);
+  refreshProgressState();
+  localStorage.setItem("course_day", courseState.nextLearningDay);
   localStorage.setItem(COURSE_STATE_KEY, JSON.stringify(courseState));
   if (courseDb && courseUid) {
     courseDb.collection("users").doc(courseUid).collection("data").doc("main")
@@ -211,21 +233,31 @@ function renderWeeklyReview(day) {
   $("weeklyResult").className = "course-hint";
   $("weeklyResult").textContent = Number.isFinite(Number(saved))
     ? `上次累積週考：${saved} 分。重新送出會更新紀錄。`
-    : `題目來源：本週 70%、歷史錯題 20%、舊內容抽查 10%；舊錯題不足時由累積內容補足。`;
+    : `80 分通過。題目來源：本週 70%、歷史錯題 20%、舊內容抽查 10%；舊錯題不足時由累積內容補足。`;
 }
 
 // ---------- 渲染 ----------
 const $ = (id) => document.getElementById(id);
 
+function updateProgressUi(day) {
+  $("dayBadge").textContent = "Day " + day;
+  $("dayJumpInput").value = day;
+  $("progressFill").style.width = Math.max(1, (day / TOTAL_DAYS) * 100) + "%";
+  $("progressNote").textContent = courseState.courseCompleted
+    ? `第 ${day} 天 / 課程已完成`
+    : `第 ${day} 天 / 正式進度 Day ${courseState.nextLearningDay}`;
+  $("prevDay").disabled = day <= 1;
+  $("nextDay").disabled = day >= TOTAL_DAYS;
+  $("nextDay").classList.toggle("locked", day >= courseState.nextLearningDay && !courseState.courseCompleted);
+  $("nextDay").setAttribute("aria-disabled", day >= courseState.nextLearningDay && !courseState.courseCompleted ? "true" : "false");
+}
+
 function render(day) {
   const d = dayData(day);
   const made = COURSE_PACK.map((x) => x.day);
 
-  $("dayBadge").textContent = "Day " + day;
-  $("progressFill").style.width = Math.max(1, (day / TOTAL_DAYS) * 100) + "%";
-  $("progressNote").textContent = `第 ${day} 天 / 共 ${TOTAL_DAYS} 天`;
-  $("prevDay").disabled = day <= 1;
-  $("nextDay").disabled = day >= TOTAL_DAYS;
+  updateProgressUi(day);
+  $("navNote").textContent = "";
   renderExitExam(day);
   renderSlotProgress(day);
   renderWeeklyReview(day);
@@ -317,7 +349,9 @@ function render(day) {
   $("checkNote").className = "course-hint";
   $("checkNote").textContent = Number.isFinite(Number(previousScore))
     ? `上次成績：${previousScore} 分。重新送出會更新紀錄。`
-    : "填完兩區後送出，70 分以上通過；未滿 70 分要補強當日內容。";
+    : (day % 7 === 0
+      ? "本日以累積週考或階段考 80 分作為解鎖標準；Daily Check 保留為練習。"
+      : "填完兩區後送出，必須 100 分才能進入下一天。未滿 100 分可以重新測驗。");
 
   // 換天要把蓋稿狀態重置，否則新對話會莫名其妙是蓋住的
   $("hideScript").checked = false;
@@ -676,18 +710,23 @@ $("submitCheckBtn").addEventListener("click", async () => {
   const vocabScore = vocabInputs.length ? vocabCorrect / vocabInputs.length * 50 : 0;
   const score = Math.round(dictScore + vocabScore);
 
-  courseState.checkScores[currentDay] = score;
-  if (!courseState.completed.includes(currentDay)) courseState.completed.push(currentDay);
-  courseState.completed.sort((a, b) => a - b);
+  courseState.checkScores[currentDay] = Math.max(Number(courseState.checkScores[currentDay]) || 0, score);
   saveCourseState();
   markSlotDone("check");
   const addedWords = await injectNewWords(d);
 
-  const passed = score >= 70;
+  const isUnlockCheck = currentDay % 7 !== 0;
+  const passed = isUnlockCheck && courseState.checkScores[currentDay] >= 100;
   $("checkNote").className = `check-result ${passed ? "pass" : "fail"}`;
-  $("checkNote").textContent = passed
-    ? `本次 ${score} 分，Daily Check 通過，進度已儲存${addedWords ? `，並加入 ${addedWords} 個新字` : ""}。`
-    : `本次 ${score} 分，未達 70 分。進度已儲存${addedWords ? `，並加入 ${addedWords} 個新字` : ""}；請補強今天內容後再測一次。`;
+  if (!isUnlockCheck) {
+    $("checkNote").className = "check-result";
+    $("checkNote").textContent = `本次 ${score} 分，最高 ${courseState.checkScores[currentDay]} 分。此日以累積週考或階段考 80 分作為解鎖標準。`;
+  } else {
+    $("checkNote").textContent = passed
+      ? `本次 ${score} 分，最高成績 100 分，已解鎖下一天${addedWords ? `，並加入 ${addedWords} 個新字` : ""}。`
+      : `本次 ${score} 分，最高 ${courseState.checkScores[currentDay]} 分。必須 100 分才能進入下一天，請修正錯題後重測。`;
+  }
+  updateProgressUi(currentDay);
 });
 
 $("submitWeeklyBtn").addEventListener("click", () => {
@@ -714,44 +753,48 @@ $("submitWeeklyBtn").addEventListener("click", () => {
     details.push({ key: reviewItemKey(item.type, item.prompt), correct });
   }
   const score = Math.round(correctCount / rows.length * 100);
-  courseState.weeklyScores[currentDay] = score;
+  courseState.weeklyScores[currentDay] = Math.max(Number(courseState.weeklyScores[currentDay]) || 0, score);
   courseState.weeklyAttempts[currentDay] = { score, correct: correctCount, total: rows.length, details, savedAt: Date.now() };
   saveCourseState();
-  $("weeklyResult").className = `check-result ${score >= 70 ? "pass" : "fail"}`;
-  $("weeklyResult").textContent = score >= 70
-    ? `累積週考 ${score} 分，答對 ${correctCount}/${rows.length} 題；錯題與修正紀錄已儲存。`
-    : `累積週考 ${score} 分，答對 ${correctCount}/${rows.length} 題；未熟內容已加入下一次累積複習。`;
+  const phasePractice = !!PHASE_EXAM_BY_DAY[currentDay];
+  const passed = !phasePractice && courseState.weeklyScores[currentDay] >= 80;
+  $("weeklyResult").className = `check-result ${passed ? "pass" : "fail"}`;
+  $("weeklyResult").textContent = phasePractice
+    ? `累積複習測驗 ${score} 分，最高 ${courseState.weeklyScores[currentDay]} 分；本日需完成下方階段考並達到 80 分。`
+    : passed
+      ? `累積週考 ${score} 分，最高 ${courseState.weeklyScores[currentDay]} 分，已達 80 分並解鎖下一天。`
+      : `累積週考 ${score} 分，最高 ${courseState.weeklyScores[currentDay]} 分；未達 80 分，錯題已加入下一次複習。`;
+  updateProgressUi(currentDay);
 });
 
-// ---------- P4：階段考 75 分擋關 ----------
+// ---------- 階段考／期末考：80 分擋關 ----------
 function renderExitExam(day) {
-  const phaseByDay = { 35: 1, 70: 2, 91: 3 };
-  const phase = phaseByDay[day];
+  const phase = PHASE_EXAM_BY_DAY[day];
   const box = $("exitExamBox");
   box.classList.toggle("hidden", !phase);
   if (!phase) return;
   const saved = courseState.exitExams[phase];
-  $("exitExamNote").textContent = `Day ${day} 是 Phase ${phase} 階段考。輸入正式考試總分。`;
+  $("exitExamNote").textContent = `Day ${day} 是 Phase ${phase} ${day === 91 ? "期末考" : "階段考"}。80 分才能完成本日。`;
   $("exitExamScore").value = Number.isFinite(Number(saved)) ? saved : "";
   $("exitExamResult").textContent = Number.isFinite(Number(saved))
-    ? (Number(saved) >= 75 ? `已通過：${saved} 分。` : `目前 ${saved} 分，需完成強化課程後重考。`)
+    ? (Number(saved) >= 80 ? `已通過：${saved} 分。` : `目前最高 ${saved} 分，需達到 80 分。`)
     : "尚未輸入成績。";
 }
 
 $("saveExitExamBtn").addEventListener("click", () => {
-  const phaseByDay = { 35: 1, 70: 2, 91: 3 };
-  const phase = phaseByDay[currentDay];
+  const phase = PHASE_EXAM_BY_DAY[currentDay];
   const score = Number($("exitExamScore").value);
   if (!phase || !Number.isFinite(score) || score < 0 || score > 100) {
     $("exitExamResult").textContent = "請輸入 0～100 的有效分數。";
     return;
   }
-  courseState.exitExams[phase] = score;
-  courseState.blockedAt = score >= 75 ? null : currentDay;
+  courseState.exitExams[phase] = Math.max(Number(courseState.exitExams[phase]) || 0, score);
+  courseState.blockedAt = courseState.exitExams[phase] >= 80 ? null : currentDay;
   saveCourseState();
-  $("exitExamResult").textContent = score >= 75
-    ? `已通過：${score} 分，可以進入下一階段。`
-    : `目前 ${score} 分，未達 75 分，下一階段維持鎖定。`;
+  $("exitExamResult").textContent = courseState.exitExams[phase] >= 80
+    ? (currentDay === 91 ? `最高 ${courseState.exitExams[phase]} 分，期末考已完成。` : `最高 ${courseState.exitExams[phase]} 分，已解鎖下一階段。`)
+    : `本次 ${score} 分，最高 ${courseState.exitExams[phase]} 分，未達 80 分。`;
+  updateProgressUi(currentDay);
 });
 
 // ---------- P5：錄音（每日存在 IndexedDB，里程碑另同步 Firebase Storage） ----------
@@ -855,20 +898,36 @@ function goDay(delta) {
   const target = currentDay + delta;
   if (target < 1 || target > TOTAL_DAYS) return;
   if (activeRecorder) stopActiveRecording();
-  const blockedAt = gateForDay(target);
-  if (blockedAt && delta > 0) {
-    courseState.blockedAt = blockedAt;
-    saveCourseState();
-    renderExitExam(currentDay);
-    $("exitExamResult").textContent = `階段考未達 75 分，不能前往 Day ${target}。`;
-    $("exitExamBox").scrollIntoView({ block: "center", behavior: "smooth" });
+  if (!courseState.courseCompleted && target > courseState.nextLearningDay) {
+    const needed = requiredScoreForDay(courseState.nextLearningDay);
+    $("navNote").textContent = `請先完成 Day ${courseState.nextLearningDay} 並達到 ${needed} 分。`;
     return;
   }
   currentDay = target;
-  courseState.blockedAt = null;
-  saveCourseState();
   render(currentDay);
 }
+
+function jumpToDay() {
+  const raw = $("dayJumpInput").value.trim();
+  const target = Number(raw);
+  if (!Number.isInteger(target) || target < 1 || target > TOTAL_DAYS) {
+    $("navNote").textContent = `請輸入 1～${TOTAL_DAYS} 的整數天數。`;
+    $("dayJumpInput").value = currentDay;
+    return;
+  }
+  if (!courseState.courseCompleted && target > courseState.nextLearningDay) {
+    $("navNote").textContent = `Day ${target} 尚未解鎖，請先完成 Day ${courseState.nextLearningDay}。`;
+    $("dayJumpInput").value = currentDay;
+    return;
+  }
+  currentDay = target;
+  render(currentDay);
+}
+
+$("dayJumpBtn").addEventListener("click", jumpToDay);
+$("dayJumpInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); jumpToDay(); }
+});
 
 // 語速（與背單字頁共用同一個 localStorage key）
 const $speed = $("courseSpeed"), $speedVal = $("courseSpeedVal");
@@ -1049,12 +1108,13 @@ async function initCourseFirebase() {
           items: localItems, folders: localFolders, course: courseState,
         });
         courseState = merged.course;
+        refreshProgressState();
         localStorage.setItem("my_vocab_items_v1", JSON.stringify(merged.items || []));
         localStorage.setItem("my_vocab_folders_v1", JSON.stringify(merged.folders || []));
-        currentDay = gateForDay(courseState.currentDay) || Math.min(TOTAL_DAYS, Number(courseState.currentDay) || 1);
+        currentDay = courseState.nextLearningDay;
         await ref.set({ items: merged.items, folders: merged.folders, course: courseState }, { merge: true });
         localStorage.setItem(COURSE_STATE_KEY, JSON.stringify(courseState));
-        localStorage.setItem("course_day", currentDay);
+        localStorage.setItem("course_day", courseState.nextLearningDay);
         render(currentDay);
       } catch (error) {
         console.error(error);

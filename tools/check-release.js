@@ -10,7 +10,7 @@ function read(name) { return fs.readFileSync(path.join(root, name), "utf8"); }
 const files = ["index.html", "course.html", "app.js", "course.js", "course-word-groups.js", "sync.js", "sw.js"];
 for (const file of files) if (!fs.existsSync(path.join(root, file))) fail(`缺少 ${file}`);
 
-const version = "1.24.0";
+const version = "1.25.0";
 for (const file of ["index.html", "course.html", "sw.js"]) {
   if (!read(file).includes(version)) fail(`${file} 版本號不是 ${version}`);
 }
@@ -42,6 +42,12 @@ if (!courseHtml.includes('id="weeklyReviewBox"')) fail("課程頁缺少每七天
 if (!read("course.js").includes("weeklyQuizFor")) fail("課程程式缺少累積週考題目產生器");
 if (!read("course.js").includes("wrongItems")) fail("課程程式缺少跨週錯題紀錄");
 if (!read("sync.js").includes("weeklyAttempts")) fail("同步程式缺少週考明細同步");
+for (const id of ["dayJumpInput", "dayJumpBtn", "navNote"]) {
+  if (!courseHtml.includes(`id="${id}"`)) fail(`課程頁缺少天數跳轉元件 #${id}`);
+}
+if (!read("course.js").includes("nextLearningDay")) fail("課程程式缺少正式學習日紀錄");
+if (!read("course.js").includes("requiredScoreForDay")) fail("課程程式缺少 100／80 分解鎖規則");
+if (!read("sync.js").includes("highestReachedDay")) fail("同步程式缺少最高解鎖日合併規則");
 if (courseHtml.includes("checkSpeaking") || courseHtml.includes("口說錄音")) fail("Daily Check 仍含口說錄音區塊");
 if (!courseHtml.includes("① 聽寫") || !courseHtml.includes("50 分") || !courseHtml.includes("② 單字")) fail("Daily Check 配分不是聽寫 50／單字 50");
 for (const id of ["courseAccountStatus", "courseGoogleLogin", "courseLogout"]) {

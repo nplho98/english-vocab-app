@@ -10,7 +10,7 @@ function read(name) { return fs.readFileSync(path.join(root, name), "utf8"); }
 const files = ["index.html", "course.html", "app.js", "course.js", "course-word-groups.js", "sync.js", "sw.js"];
 for (const file of files) if (!fs.existsSync(path.join(root, file))) fail(`缺少 ${file}`);
 
-const version = "1.22.0";
+const version = "1.22.1";
 for (const file of ["index.html", "course.html", "sw.js"]) {
   if (!read(file).includes(version)) fail(`${file} 版本號不是 ${version}`);
 }

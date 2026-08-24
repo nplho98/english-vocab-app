@@ -306,9 +306,9 @@ function renderTodayWords(d) {
         const state = firstDay === d.day ? "today" : firstDay < d.day ? "learned" : "future";
         const note = state === "today" ? "今天" : state === "learned" ? `Day ${firstDay} 已學` : `Day ${firstDay} 學`;
         const info = wordInfo(text);
-        return `<span class="related-word-chip ${state}" title="${zh}"><b>${text}</b><small>${zh} · ${note}</small>${info && info.ph ? `<em>${info.ph}</em>` : ""}</span>`;
+        return `<li class="related-word-item ${state}"><b>${text}</b><span>${zh}</span>${info && info.ph ? `<em>${info.ph}</em>` : ""}<small>${note}</small></li>`;
       }).join("");
-      return `<details class="word-group-card"><summary>${group.label}</summary><div class="related-word-chips">${chips}</div></details>`;
+      return `<details class="word-group-card"><summary>${group.label}</summary><ul class="related-word-list">${chips}</ul></details>`;
     }).join("")
     : `<p class="course-hint">本日沒有新增的同類字群。</p>`;
 }

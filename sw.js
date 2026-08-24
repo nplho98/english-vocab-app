@@ -1,5 +1,5 @@
 // Service Worker — 讓 App 離線也能打開
-const CACHE = "vocab-app-v1.22.3";
+const CACHE = "vocab-app-v1.23.0";
 const ASSETS = [
   "./",
   "index.html",
@@ -8,15 +8,15 @@ const ASSETS = [
   "style.css",
   "course.css",
   "speech.js?v=1.20.0",
-  "course.js?v=1.22.3",
-  "course-word-groups.js?v=1.22.0",
+  "course.js?v=1.23.0",
+  "course-word-groups.js?v=1.23.0",
   "dict.js",
   "starter-pack.js",
   "pack-jhs1.js",
   "pack-jhs2.js",
   "pack-jhs3.js",
   "pack-sent-ph.js",
-  "course-pack.js?v=1.20.0",
+  "course-pack.js?v=1.23.0",
   "course-pack-p2a.js?v=1.20.0",
   "course-pack-p2b.js?v=1.20.0",
   "course-pack-p3.js?v=1.20.0",

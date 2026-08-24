@@ -211,7 +211,7 @@ function render(day) {
   $("checkNote").className = "course-hint";
   $("checkNote").textContent = Number.isFinite(Number(previousScore))
     ? `上次成績：${previousScore} 分。重新送出會更新紀錄。`
-    : "填完三區後送出，70 分以上通過；未滿 70 分要補強當日內容。";
+    : "填完兩區後送出，70 分以上通過；未滿 70 分要補強當日內容。";
 
   // 換天要把蓋稿狀態重置，否則新對話會莫名其妙是蓋住的
   $("hideScript").checked = false;

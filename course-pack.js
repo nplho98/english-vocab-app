@@ -383,7 +383,7 @@ function makeLesson(spec) {
     check: {
       dictation: (spec.dictation || dialogue.slice(0, 5).map((line) => line.en)),
       speaking: spec.speaking,
-      vocab: (spec.vocab || newWords.slice(0, 10).map((word) => word.t)),
+      vocab: (spec.vocab || newWords.slice(0, 8).map((word) => word.t)),
     },
     aiPrompt:
       `${spec.scene}\n請扮演對話中的另一個角色，只用下列句子與我做英文對話：\n` +

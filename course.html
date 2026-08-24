@@ -44,7 +44,6 @@
       <p class="scene-note" id="sceneNote"></p>
       <ul class="slot-list" id="slotList">
         <li class="slot" data-slot="listen"><span class="slot-time">25 分</span><span class="slot-name">🎧 聽力灌耳</span><span class="slot-check">○</span></li>
-        <li class="slot" data-slot="shadow"><span class="slot-time">30 分</span><span class="slot-name">🗣️ 影子跟讀</span><span class="slot-check">○</span></li>
         <li class="slot" data-slot="drill"><span class="slot-time">30 分</span><span class="slot-name">🔁 句型拆解</span><span class="slot-check">○</span></li>
         <li class="slot" data-slot="ai"><span class="slot-time">50 分</span><span class="slot-name">🤖 AI 角色扮演</span><span class="slot-check">○</span></li>
         <li class="slot" data-slot="rw"><span class="slot-time">25 分</span><span class="slot-name">✍️ 讀寫</span><span class="slot-check">○</span></li>
@@ -83,27 +82,6 @@
         <div class="passage-zh" id="passageZh"></div>
         <button class="course-btn btn-ghost" id="passageSpeak">🔊 唸一遍</button>
       </details>
-    </section>
-
-    <section class="tool-box course-box" id="recordingBox">
-      <h2 class="course-h2">影子跟讀錄音 <span class="course-sub">錄完立即回聽比對</span></h2>
-      <p class="course-hint">先播放今日對話，再錄下自己的跟讀。每日錄音只存在這台裝置。</p>
-      <div class="record-actions">
-        <button class="course-btn btn-rec" id="shadowRecordBtn">開始錄音</button>
-        <button class="course-btn btn-ghost" id="shadowStopBtn" disabled>停止</button>
-        <button class="course-btn btn-ghost" id="shadowPlayBtn" disabled>播放錄音</button>
-      </div>
-      <p class="course-hint" id="shadowRecordNote">尚未錄音。</p>
-      <div class="milestone-box hidden" id="milestoneBox">
-        <b id="milestoneTitle"></b>
-        <p class="course-hint">Day 1、35、70、91 都錄同一段自我介紹，才能前後比較。</p>
-        <div class="record-actions">
-          <button class="course-btn btn-rec" id="milestoneRecordBtn">錄里程碑</button>
-          <button class="course-btn btn-ghost" id="milestoneStopBtn" disabled>停止</button>
-          <button class="course-btn btn-ghost" id="milestonePlayBtn" disabled>播放錄音</button>
-        </div>
-        <p class="course-hint" id="milestoneNote">尚未錄音。</p>
-      </div>
     </section>
 
     <section class="tool-box course-box">
@@ -154,7 +132,7 @@
 
     <div class="course-foot">
       <a href="index.html" class="course-btn btn-ghost full">📖 去背單字本</a>
-      <p class="dev-copyright">© 何朋哲 · v1.20.0</p>
+      <p class="dev-copyright">© 何朋哲 · v1.21.0</p>
     </div>
 
   </main>
@@ -174,6 +152,6 @@
   <script src="course-vocab-extra.js?v=1.20.0"></script>
   <script src="course-phonetics.js?v=1.20.0"></script>
   <script src="course-pack-finalize.js?v=1.20.0"></script>
-  <script src="course.js?v=1.20.0"></script>
+  <script src="course.js?v=1.21.0"></script>
 </body>
 </html>

@@ -123,7 +123,6 @@ function render(day) {
   $("nextDay").disabled = day >= TOTAL_DAYS;
   renderExitExam(day);
   renderSlotProgress(day);
-  renderRecordingState(day);
 
   if (!d) {
     // 內容還沒做到這一天
@@ -553,76 +552,6 @@ async function toggleSpeakingRecording(btn) {
     $("checkNote").textContent = "無法使用麥克風，請允許瀏覽器的麥克風權限。";
   }
 }
-
-async function renderRecordingState(day) {
-  const shadowKey = recordKey(day, "shadow");
-  const hasShadow = await hasStoredRecording(shadowKey);
-  if (day !== currentDay) return;
-  $("shadowPlayBtn").disabled = !hasShadow;
-  $("shadowRecordNote").textContent = hasShadow ? "這一天已有錄音，可以播放或重新錄製。" : "尚未錄音。";
-  const milestone = [1, 35, 70, 91].includes(day);
-  $("milestoneBox").classList.toggle("hidden", !milestone);
-  if (milestone) {
-    $("milestoneTitle").textContent = `Day ${day} 自我介紹里程碑`;
-    const hasMilestone = await hasStoredRecording(recordKey(day, "milestone"));
-    if (day !== currentDay) return;
-    $("milestonePlayBtn").disabled = !hasMilestone;
-    $("milestoneNote").textContent = hasMilestone
-      ? (courseState.recordings[day] ? "已存本機並同步雲端。" : "已存本機；登入雲端後會再同步。")
-      : "尚未錄音。";
-  }
-}
-
-async function uploadMilestone(day, blob) {
-  if (!courseStorage || !courseUid) return false;
-  const ext = blob.type.includes("ogg") ? "ogg" : "webm";
-  const ref = courseStorage.ref(`course-recordings/${courseUid}/day-${day}.${ext}`);
-  await ref.put(blob, { contentType: blob.type || "audio/webm" });
-  courseState.recordings[day] = await ref.getDownloadURL();
-  saveCourseState();
-  return true;
-}
-
-$("shadowRecordBtn").addEventListener("click", async () => {
-  const key = recordKey(currentDay, "shadow");
-  try {
-    await startRecording(key, () => {
-      $("shadowRecordBtn").textContent = "重新錄音";
-      $("shadowRecordBtn").classList.remove("recording");
-      $("shadowStopBtn").disabled = true;
-      $("shadowPlayBtn").disabled = false;
-      $("shadowRecordNote").textContent = "錄音已存在這台裝置。";
-      markSlotDone("shadow");
-    });
-    $("shadowRecordBtn").textContent = "錄音中";
-    $("shadowRecordBtn").classList.add("recording");
-    $("shadowStopBtn").disabled = false;
-  } catch { $("shadowRecordNote").textContent = "請允許麥克風權限後再試。"; }
-});
-$("shadowStopBtn").addEventListener("click", stopActiveRecording);
-$("shadowPlayBtn").addEventListener("click", () => playStoredRecording(recordKey(currentDay, "shadow")));
-
-$("milestoneRecordBtn").addEventListener("click", async () => {
-  const day = currentDay;
-  try {
-    await startRecording(recordKey(day, "milestone"), async (blob) => {
-      $("milestoneRecordBtn").textContent = "重新錄音";
-      $("milestoneRecordBtn").classList.remove("recording");
-      $("milestoneStopBtn").disabled = true;
-      $("milestonePlayBtn").disabled = false;
-      $("milestoneNote").textContent = "已存本機，正在同步雲端…";
-      try {
-        const uploaded = await uploadMilestone(day, blob);
-        $("milestoneNote").textContent = uploaded ? "已存本機並同步雲端。" : "已存本機；登入雲端後會再同步。";
-      } catch { $("milestoneNote").textContent = "已存本機；雲端同步失敗，稍後可重新錄製再試。"; }
-    });
-    $("milestoneRecordBtn").textContent = "錄音中";
-    $("milestoneRecordBtn").classList.add("recording");
-    $("milestoneStopBtn").disabled = false;
-  } catch { $("milestoneNote").textContent = "請允許麥克風權限後再試。"; }
-});
-$("milestoneStopBtn").addEventListener("click", stopActiveRecording);
-$("milestonePlayBtn").addEventListener("click", () => playStoredRecording(recordKey(currentDay, "milestone")));
 
 // ---------- 固定元件的事件（只綁一次）----------
 $("prevDay").addEventListener("click", () => goDay(-1));
